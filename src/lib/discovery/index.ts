@@ -25,17 +25,32 @@ function dedupeKey(p: ProductCandidate): string {
 
 function mergeCandidate(a: ProductCandidate, b: ProductCandidate): ProductCandidate {
   // Keep the richer record; prefer shopping-source pricing/ratings.
+  // Prefer a real retailer URL over any Google link, regardless of which record
+  // it came from, so users always get a direct product page.
+  const aIsGoogle = isGoogleHost(a.url);
+  const bIsGoogle = isGoogleHost(b.url);
+  const url = !aIsGoogle ? a.url : !bIsGoogle ? b.url : a.url;
   return {
     ...a,
+    url,
     price: a.price ?? b.price,
     rating: a.rating ?? b.rating,
     reviewCount: a.reviewCount ?? b.reviewCount,
-    imageUrl: a.imageUrl ?? b.imageUrl,
+    // Always keep an image if either record has one.
+    imageUrl: a.imageUrl || b.imageUrl || null,
     snippet: a.snippet ?? b.snippet,
     brand: a.brand ?? b.brand,
     retailer: a.retailer ?? b.retailer,
     specs: { ...b.specs, ...a.specs },
   };
+}
+
+function isGoogleHost(url: string): boolean {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").startsWith("google.");
+  } catch {
+    return false;
+  }
 }
 
 export async function discoverForTheme(theme: Theme): Promise<ProductCandidate[]> {
@@ -50,9 +65,11 @@ export async function discoverForTheme(theme: Theme): Promise<ProductCandidate[]
   // gives us price+rating directly, so we lean on it and use fewer Tavily calls.
   const tasks: Promise<ProductCandidate[]>[] = [];
   for (const q of theme.searchQueries.slice(0, 2)) {
+    // Shopping gives price/rating/image; organic gives direct retailer URLs.
     tasks.push(serperShopping(q, theme.id, 12));
+    tasks.push(serperOrganic(`${q} buy`, theme.id, 6));
   }
-  // One organic pass for DTC / editorial coverage.
+  // One more organic pass for DTC / editorial coverage.
   tasks.push(serperOrganic(`best ${theme.title}`, theme.id, 6));
 
   const settled = await Promise.allSettled(tasks);

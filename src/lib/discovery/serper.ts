@@ -9,13 +9,28 @@ const BASE = "https://google.serper.dev";
 
 interface SerperShoppingItem {
   title?: string;
-  source?: string;
-  link?: string;
+  source?: string; // retailer name, e.g. "Williams Sonoma"
+  link?: string; // often a google.com/shopping redirect, not the retailer page
+  productLink?: string; // sometimes the direct retailer/product URL
+  offers?: string;
   price?: string;
   rating?: number;
   ratingCount?: number;
   imageUrl?: string;
+  image?: string;
+  thumbnail?: string;
   delivery?: string;
+}
+
+// Serper Shopping's `link` is usually a Google Shopping page, which we don't
+// want to surface to users. Detect those so we can prefer a real retailer URL.
+function isGoogleLink(url: string): boolean {
+  try {
+    const h = new URL(url).hostname.replace(/^www\./, "");
+    return h.endsWith("google.com") || h === "google.com" || h.startsWith("google.");
+  } catch {
+    return false;
+  }
 }
 
 function parsePrice(raw?: string): number | null {
@@ -40,16 +55,24 @@ export async function serperShopping(
   const data = (await res.json()) as { shopping?: SerperShoppingItem[] };
   const items = data.shopping || [];
   return items
-    .filter((it) => it.link && it.title)
+    .filter((it) => it.title)
     .map((it, i): ProductCandidate => {
-      const host = retailerFromUrl(it.link!);
+      // Prefer a direct retailer URL. productLink is the real page when present;
+      // otherwise the main link, unless it's a Google Shopping redirect.
+      const candidateUrl =
+        it.productLink && !isGoogleLink(it.productLink)
+          ? it.productLink
+          : it.link && !isGoogleLink(it.link)
+          ? it.link
+          : null;
+      const host = candidateUrl ? retailerFromUrl(candidateUrl) : null;
       return {
         id: `serper-shop-${themeId}-${i}-${Math.random().toString(36).slice(2, 7)}`,
         title: it.title!.trim(),
         brand: null,
         retailer: it.source || retailerLabel(host),
-        url: it.link!,
-        imageUrl: it.imageUrl || null,
+        url: candidateUrl || "",
+        imageUrl: it.imageUrl || it.image || it.thumbnail || null,
         price: parsePrice(it.price),
         currency: "USD",
         rating: typeof it.rating === "number" ? it.rating : null,
@@ -60,7 +83,9 @@ export async function serperShopping(
         source: "serper-shopping",
       };
     })
-    .filter((p) => isAcceptableRetailer(retailerFromUrl(p.url)));
+    // Drop items with no real retailer URL (e.g. only a Google Shopping link),
+    // and any blocked marketplaces. Real retailer pages come from organic/Tavily.
+    .filter((p) => p.url && isAcceptableRetailer(retailerFromUrl(p.url)));
 }
 
 interface SerperOrganicItem {

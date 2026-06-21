@@ -55,6 +55,20 @@ export default function ProductCard({
 
   return (
     <div className="card">
+      {product.imageUrl && (
+        <div className="card-image">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={product.imageUrl}
+            alt={product.title}
+            loading="lazy"
+            onError={(ev) => {
+              // Hide broken images gracefully.
+              (ev.currentTarget.parentElement as HTMLElement).style.display = "none";
+            }}
+          />
+        </div>
+      )}
       <div className="card-top">
         <div>
           <div className="rank">#{rank}</div>

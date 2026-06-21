@@ -28,15 +28,19 @@ export async function resolveRetailerLinks(
     needsFix.map(async (p) => {
       const q = `${p.title} ${p.retailer || ""}`.trim();
       const results = await serperOrganic(q, "resolve", 8);
-      // Prefer a result on a known/real retailer domain that isn't Google.
+      // CRITICAL: only swap the link if the result is confidently THE SAME
+      // product. A wrong-but-real link is worse than a correct Google link.
       const hit = results.find((r) => {
         const host = retailerFromUrl(r.url);
-        return host && !host.startsWith("google.") && isLikelyProductPage(r.url);
+        if (!host || host.startsWith("google.")) return false;
+        if (!isLikelyProductPage(r.url)) return false;
+        return isSameProduct(p.title, p.brand, r.title || "");
       });
       if (hit) {
         p.url = hit.url;
         if (!p.retailer) p.retailer = retailerFromUrl(hit.url);
       }
+      // If no confident match, we leave p.url as-is (the original link).
     })
   );
 
@@ -44,6 +48,32 @@ export async function resolveRetailerLinks(
   const deadline = new Promise<void>((resolve) => setTimeout(resolve, 12000));
   await Promise.race([work, deadline]);
   return products;
+}
+
+// Confident same-product check. We only trust a resolved link when the result
+// title clearly refers to the same item: the brand must appear (when known), and
+// the meaningful words of the original title must mostly be present.
+function isSameProduct(origTitle: string, brand: string | null, resultTitle: string): boolean {
+  const norm = (s: string) =>
+    s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  const orig = norm(origTitle);
+  const res = norm(resultTitle);
+  if (!res) return false;
+
+  // Brand must be present in the result (strong signal it's the same line).
+  if (brand) {
+    const b = norm(brand);
+    if (b && !res.includes(b)) return false;
+  }
+
+  // Significant-word overlap. Ignore short/generic words.
+  const stop = new Set(["the", "and", "for", "with", "slice", "cup", "toaster", "coffee", "maker", "inch", "new"]);
+  const origWords = orig.split(" ").filter((w) => w.length > 2 && !stop.has(w));
+  if (origWords.length === 0) return false;
+  const hits = origWords.filter((w) => res.includes(w)).length;
+  const ratio = hits / origWords.length;
+  // Require a strong majority of distinctive words to match.
+  return ratio >= 0.6;
 }
 
 // Heuristic: a product page usually has a deeper path than a homepage and often

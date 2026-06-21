@@ -17,8 +17,12 @@ function step(label: string, detail?: string): RunStep {
 }
 
 // How complete a product record is (used to prioritize the pre-filter slice).
+// A DIRECT retailer link is weighted heavily so products that link straight to a
+// store rise above ones that only have a Google Shopping link.
 function completeness(p: ProductCandidate): number {
+  const directLink = p.url && !isGoogleUrl(p.url) ? 4 : 0;
   return (
+    directLink +
     (p.price != null ? 2 : 0) +
     (p.rating != null ? 2 : 0) +
     (p.reviewCount != null ? 1 : 0) +
@@ -27,28 +31,51 @@ function completeness(p: ProductCandidate): number {
   );
 }
 
-// Dedupe products that surfaced under multiple angles. Key on brand+title prefix
-// and on URL, keeping the first (richest) occurrence.
+function isGoogleUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "").startsWith("google.");
+  } catch {
+    return true;
+  }
+}
+
+// Dedupe AND MERGE products that surfaced under multiple angles/sources. Keying
+// on the title prefix, we combine records for the same product. Crucially, this
+// pairs an Exa result (direct retailer link, may lack price/image) with a Serper
+// result (price/image, but a Google Shopping link) into ONE record that has the
+// DIRECT retailer link + the price/image. Without this merge, the priced Serper
+// record wins the later pre-filter and users only see Google links.
 function dedupeAcrossThemes(products: ProductCandidate[]): ProductCandidate[] {
-  const seen = new Set<string>();
-  const out: ProductCandidate[] = [];
+  const byTitle = new Map<string, ProductCandidate>();
   for (const p of products) {
     const titleKey = p.title.toLowerCase().replace(/[^a-z0-9 ]/g, "").split(" ").slice(0, 6).join(" ");
-    const urlKey = (() => {
-      try {
-        const u = new URL(p.url);
-        return u.hostname + u.pathname;
-      } catch {
-        return p.url;
-      }
-    })();
-    const key = `${titleKey}|${urlKey}`;
-    if (seen.has(key) || seen.has(titleKey)) continue;
-    seen.add(key);
-    seen.add(titleKey);
-    out.push(p);
+    if (!titleKey) continue;
+    const existing = byTitle.get(titleKey);
+    if (!existing) {
+      byTitle.set(titleKey, p);
+      continue;
+    }
+    // Merge: keep a direct (non-Google) URL, and fill in any missing fields.
+    const existingGoogle = isGoogleUrl(existing.url);
+    const pGoogle = isGoogleUrl(p.url);
+    const url = !existingGoogle ? existing.url : !pGoogle ? p.url : existing.url;
+    const owner = url === existing.url ? existing : p;
+    const other = owner === existing ? p : existing;
+    byTitle.set(titleKey, {
+      ...owner,
+      url,
+      // Image must belong to the record we trust (the link owner) when it has
+      // one, to keep image+link consistent; otherwise borrow.
+      imageUrl: owner.imageUrl || other.imageUrl || null,
+      price: owner.price ?? other.price,
+      rating: owner.rating ?? other.rating,
+      reviewCount: owner.reviewCount ?? other.reviewCount,
+      snippet: owner.snippet ?? other.snippet,
+      brand: owner.brand ?? other.brand,
+      retailer: owner.retailer ?? other.retailer,
+    });
   }
-  return out;
+  return [...byTitle.values()];
 }
 
 // Run the entire pipeline in one call and return the finished run. The create

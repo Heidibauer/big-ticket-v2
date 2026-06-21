@@ -41,7 +41,10 @@ async function exaSearchScoped(
   tag: string
 ): Promise<ProductCandidate[]> {
   const key = process.env.EXA_API_KEY;
-  if (!key) return [];
+  if (!key) {
+    console.log("[exa] no EXA_API_KEY set");
+    return [];
+  }
   const res = await fetchWithTimeout(
     `${BASE}/search`,
     {
@@ -52,13 +55,23 @@ async function exaSearchScoped(
         numResults: num,
         type: "auto",
         includeDomains: domains,
-        contents: { text: { maxCharacters: 400 }, imageLinks: 1 },
+        // Minimal, well-supported contents request: text + images.
+        contents: { text: true, livecrawl: "fallback" },
       }),
     },
     12000
   );
-  if (!res || !res.ok) return [];
+  if (!res) {
+    console.log(`[exa] ${tag} request failed/timed out for "${query}"`);
+    return [];
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.log(`[exa] ${tag} HTTP ${res.status} for "${query}": ${body.slice(0, 200)}`);
+    return [];
+  }
   const data = (await res.json()) as { results?: ExaResult[] };
+  console.log(`[exa] ${tag} "${query}" -> ${data.results?.length ?? 0} results`);
   return (data.results || [])
     .filter((r) => r.url && r.title)
     .map((r, i): ProductCandidate => {

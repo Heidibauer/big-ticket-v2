@@ -4,7 +4,6 @@
 
 import type { ProductCandidate, Theme } from "@/lib/types";
 import { serperShopping } from "./serper";
-import { exaRetailerSearch, exaAvailable } from "./exa";
 import { fixtureProducts } from "@/data/fixtures";
 import { resolveMode } from "./mode";
 import { retailerFromUrl } from "./retailers";
@@ -71,10 +70,12 @@ export async function discoverForTheme(theme: Theme): Promise<ProductCandidate[]
   //    within prioritized retailers (majors then boutique). Correctly matched
   //    links, no guessing. When both find the same product, we keep Exa's direct
   //    retailer URL and Serper's price/image (see mergeCandidate).
+  // Discovery uses Serper Shopping only (fast, structured, no rate-limit issues).
+  // Direct retailer links are resolved later, ONLY for the final products, so we
+  // don't hammer the link provider with hundreds of calls (which caused 429s).
   const tasks: Promise<ProductCandidate[]>[] = [];
   for (const q of theme.searchQueries.slice(0, 3)) {
     tasks.push(serperShopping(q, theme.id, 20));
-    if (exaAvailable()) tasks.push(exaRetailerSearch(q, theme.id));
   }
 
   const settled = await Promise.allSettled(tasks);

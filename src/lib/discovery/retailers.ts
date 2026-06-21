@@ -2,6 +2,20 @@
 // the "credibility" judgment axis. This is a starting heuristic the operator
 // can tune; it is intentionally explicit rather than a black box.
 
+// Prioritized retailers for resolving DIRECT product links. Majors first, then
+// boutique/specialty. Edit these to control exactly which stores get searched.
+export const MAJOR_RETAILERS = [
+  "williams-sonoma.com", "target.com", "crateandbarrel.com", "wayfair.com",
+  "nordstrom.com", "westelm.com", "potterybarn.com", "surlatable.com",
+  "bedbathandbeyond.com", "macys.com", "bloomingdales.com", "kohls.com",
+  "amazon.com", "bestbuy.com", "homedepot.com",
+];
+export const BOUTIQUE_RETAILERS = [
+  "anthropologie.com", "mackenzie-childs.com", "lenox.com", "food52.com",
+  "smeg.com", "qvc.com", "uncommongoods.com", "worldmarket.com",
+  "terrain.com", "anthropologie.com", "shopterrain.com",
+];
+
 const TIER_1 = [
   "amazon.com", "wayfair.com", "target.com", "bestbuy.com", "williams-sonoma.com",
   "potterybarn.com", "crateandbarrel.com", "westelm.com", "cb2.com", "rejuvenation.com",

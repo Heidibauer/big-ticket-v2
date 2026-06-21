@@ -6,6 +6,7 @@ import type { Run, DiscoveryBrief, EvaluatedProduct, RunStep, ProductCandidate }
 import { strategizeThemes } from "./themes";
 import { discoverForTheme } from "@/lib/discovery";
 import { isUsedOrResale, retailerFromUrl } from "@/lib/discovery/retailers";
+import { resolveFinalLinks } from "@/lib/discovery/resolveFinal";
 import { evaluateProducts } from "./evaluator";
 import { pairwiseRerank } from "./reranker";
 import { curate } from "./curator";
@@ -163,6 +164,13 @@ export async function runPipeline(run: Run): Promise<Run> {
     // 6. CURATION — target a fuller collection (20-30 products).
     run.steps.push(step("Curating the collection", "Diversity + editorial frame"));
     const collection = await curate(evaluated, brief, 25);
+
+    // 7. RESOLVE DIRECT LINKS — for the FINAL products only (throttled, so we
+    //    never trip the link provider's rate limit). Turns Google Shopping links
+    //    into direct retailer pages, with strict same-product matching so we
+    //    never link to the wrong item. Unresolved products keep their correct link.
+    run.steps.push(step("Resolving retailer links", "Finding direct product pages for finalists"));
+    collection.products = await resolveFinalLinks(collection.products);
 
     // Final safety net: never show a used-goods / resale link.
     collection.products = collection.products.filter(

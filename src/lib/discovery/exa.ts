@@ -5,23 +5,16 @@
 // replaces the old "guess the link by re-searching" approach that mismatched.
 
 import type { ProductCandidate } from "@/lib/types";
-import { retailerFromUrl, retailerLabel, isUsedOrResale } from "./retailers";
+import {
+  retailerFromUrl,
+  retailerLabel,
+  isUsedOrResale,
+  MAJOR_RETAILERS,
+  BOUTIQUE_RETAILERS,
+} from "./retailers";
 import { fetchWithTimeout } from "./http";
 
 const BASE = "https://api.exa.ai";
-
-// Tier 1: major trusted US retailers. Tier 2: boutique / unique / specialty.
-// Discovery searches these directly so links are first-party store pages.
-export const MAJOR_RETAILERS = [
-  "williams-sonoma.com", "target.com", "crateandbarrel.com", "wayfair.com",
-  "nordstrom.com", "westelm.com", "potterybarn.com", "surlatable.com",
-  "bedbathandbeyond.com", "macys.com", "bloomingdales.com", "kohls.com",
-];
-export const BOUTIQUE_RETAILERS = [
-  "anthropologie.com", "mackenzie-childs.com", "lenox.com", "food52.com",
-  "smeg.com", "dolcegabbana.com", "drewbarrymorebeautiful.com", "qvc.com",
-  "uncommongoods.com", "world-market.com", "terrain.com", "etsy.com",
-];
 
 interface ExaResult {
   title?: string;
@@ -112,4 +105,15 @@ export async function exaRetailerSearch(
 
 export function exaAvailable(): boolean {
   return !!process.env.EXA_API_KEY;
+}
+
+// Single Exa call to resolve a direct retailer link for ONE product. Searches
+// within all prioritized retailers at once. Returns lightweight {url,title}.
+export async function exaScopedForProduct(
+  query: string
+): Promise<{ url: string; title: string }[]> {
+  if (!process.env.EXA_API_KEY) return [];
+  const domains = [...MAJOR_RETAILERS, ...BOUTIQUE_RETAILERS];
+  const results = await exaSearchScoped(query, domains, "final", 8, "resolve");
+  return results.map((r) => ({ url: r.url, title: r.title }));
 }

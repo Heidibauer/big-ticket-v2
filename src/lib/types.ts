@@ -35,7 +35,7 @@ export interface ProductCandidate {
   snippet: string | null; // description / context gathered during enrichment
   specs: Record<string, string>;
   themeId: string;
-  source: "serper-shopping" | "serper-organic" | "tavily" | "fixture";
+  source: "serper-shopping" | "serper-organic" | "tavily" | "exa" | "fixture";
 }
 
 // The judgment layer. Each axis is 0-100. The composite is a weighted fusion

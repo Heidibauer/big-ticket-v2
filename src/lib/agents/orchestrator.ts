@@ -5,7 +5,6 @@
 import type { Run, DiscoveryBrief, EvaluatedProduct, RunStep, ProductCandidate } from "@/lib/types";
 import { strategizeThemes } from "./themes";
 import { discoverForTheme } from "@/lib/discovery";
-import { resolveRetailerLinks } from "@/lib/discovery/resolveLinks";
 import { isUsedOrResale, retailerFromUrl } from "@/lib/discovery/retailers";
 import { evaluateProducts } from "./evaluator";
 import { pairwiseRerank } from "./reranker";
@@ -138,11 +137,6 @@ export async function runPipeline(run: Run): Promise<Run> {
     run.steps.push(step("Curating the collection", "Diversity + editorial frame"));
     const collection = await curate(evaluated, brief, 25);
 
-    // 7. RESOLVE LINKS — for the final products only, turn any Google Shopping
-    //    links into direct retailer product pages (preferring quality retailers,
-    //    never used-goods/resale) so every "View product" is buyable and new.
-    run.steps.push(step("Resolving retailer links", "Finding direct retailer pages"));
-    collection.products = await resolveRetailerLinks(collection.products);
     // Final safety net: never show a used-goods / resale link.
     collection.products = collection.products.filter(
       (p) => !isUsedOrResale(retailerFromUrl(p.url))

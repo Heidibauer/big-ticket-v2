@@ -4,6 +4,7 @@
 
 import type { ProductCandidate, Theme } from "@/lib/types";
 import { serperShopping } from "./serper";
+import { exaRetailerSearch, exaAvailable } from "./exa";
 import { fixtureProducts } from "@/data/fixtures";
 import { resolveMode } from "./mode";
 import { retailerFromUrl } from "./retailers";
@@ -23,24 +24,28 @@ function dedupeKey(p: ProductCandidate): string {
 }
 
 function mergeCandidate(a: ProductCandidate, b: ProductCandidate): ProductCandidate {
-  // Keep the richer record; prefer shopping-source pricing/ratings.
-  // Prefer a real retailer URL over any Google link, regardless of which record
-  // it came from, so users always get a direct product page.
+  // Choose ONE record to be the "link owner" and keep its url AND image together,
+  // so the image and link always describe the same listing (this prevents the
+  // image-says-pink / link-goes-to-silver mismatch). We prefer a direct retailer
+  // URL (non-Google) as the owner; Exa results are direct retailer pages.
   const aIsGoogle = isGoogleHost(a.url);
   const bIsGoogle = isGoogleHost(b.url);
-  const url = !aIsGoogle ? a.url : !bIsGoogle ? b.url : a.url;
+  const owner = !aIsGoogle ? a : !bIsGoogle ? b : a; // record whose url we trust
+  const other = owner === a ? b : a;
   return {
-    ...a,
-    url,
-    price: a.price ?? b.price,
-    rating: a.rating ?? b.rating,
-    reviewCount: a.reviewCount ?? b.reviewCount,
-    // Always keep an image if either record has one.
-    imageUrl: a.imageUrl || b.imageUrl || null,
-    snippet: a.snippet ?? b.snippet,
-    brand: a.brand ?? b.brand,
-    retailer: a.retailer ?? b.retailer,
-    specs: { ...b.specs, ...a.specs },
+    ...owner,
+    // Link and image come from the SAME owner record. Only borrow the other's
+    // image if the owner has none.
+    url: owner.url,
+    imageUrl: owner.imageUrl || other.imageUrl || null,
+    // Price/rating are attribute data; safe to borrow if missing.
+    price: owner.price ?? other.price,
+    rating: owner.rating ?? other.rating,
+    reviewCount: owner.reviewCount ?? other.reviewCount,
+    snippet: owner.snippet ?? other.snippet,
+    brand: owner.brand ?? other.brand,
+    retailer: owner.retailer ?? other.retailer,
+    specs: { ...other.specs, ...owner.specs },
   };
 }
 
@@ -59,15 +64,17 @@ export async function discoverForTheme(theme: Theme): Promise<ProductCandidate[]
     return fixtureProducts(theme.id);
   }
 
-  // Live: fan out across queries and sources in parallel. Capped to keep the
-  // total run well under the serverless time limit. Serper Shopping is fast and
-  // gives us price+rating directly, so we lean on it and use fewer Tavily calls.
-  // Products come ONLY from Shopping results: real, buyable items with images,
-  // prices, and retailer info. We cast a WIDE net here (high recall) and filter
-  // hard in the rerank stage. ~20 results per query, all queries in parallel.
+  // Live: fan out across queries AND sources in parallel.
+  //  - Serper Shopping: structured products with price/rating/image (but links
+  //    are often Google Shopping pages).
+  //  - Exa retailer search: direct first-party store product pages, searched
+  //    within prioritized retailers (majors then boutique). Correctly matched
+  //    links, no guessing. When both find the same product, we keep Exa's direct
+  //    retailer URL and Serper's price/image (see mergeCandidate).
   const tasks: Promise<ProductCandidate[]>[] = [];
   for (const q of theme.searchQueries.slice(0, 3)) {
     tasks.push(serperShopping(q, theme.id, 20));
+    if (exaAvailable()) tasks.push(exaRetailerSearch(q, theme.id));
   }
 
   const settled = await Promise.allSettled(tasks);

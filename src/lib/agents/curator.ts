@@ -43,14 +43,17 @@ export async function curate(
     return pos < 0.33 ? "low" : pos < 0.66 ? "mid" : "high";
   };
 
+  // Scale clustering caps with the target so a large collection can fill up.
+  const brandCap = Math.max(3, Math.ceil(targetSize / 4));
+  const priceCap = Math.ceil(targetSize * 0.6);
   for (const p of pool) {
     if (selected.length >= targetSize) break;
     const brand = (p.brand || p.retailer || "?").toLowerCase();
     const b = bucket(p.price);
-    const brandPenalty = (brandCount[brand] || 0) >= 2 ? 1 : 0;
-    const pricePenalty = (priceBuckets[b] || 0) >= Math.ceil(targetSize / 2) ? 1 : 0;
+    const brandPenalty = (brandCount[brand] || 0) >= brandCap ? 1 : 0;
+    const pricePenalty = (priceBuckets[b] || 0) >= priceCap ? 1 : 0;
     // Skip only if it's a weak product AND would worsen clustering.
-    if ((brandPenalty || pricePenalty) && p.evaluation.composite < 70) continue;
+    if ((brandPenalty || pricePenalty) && p.evaluation.composite < 65) continue;
     selected.push(p);
     brandCount[brand] = (brandCount[brand] || 0) + 1;
     priceBuckets[b] = (priceBuckets[b] || 0) + 1;

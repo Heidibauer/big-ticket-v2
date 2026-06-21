@@ -5,6 +5,7 @@
 import type { Run, DiscoveryBrief, EvaluatedProduct, RunStep, ProductCandidate } from "@/lib/types";
 import { strategizeThemes } from "./themes";
 import { discoverForTheme } from "@/lib/discovery";
+import { resolveRetailerLinks } from "@/lib/discovery/resolveLinks";
 import { evaluateProducts } from "./evaluator";
 import { pairwiseRerank } from "./reranker";
 import { curate } from "./curator";
@@ -117,7 +118,7 @@ export async function runPipeline(run: Run): Promise<Run> {
     //    matches and let the model compare them head-to-head to settle order.
     const finalists = [...evaluated]
       .sort((a, b) => b.evaluation.composite - a.evaluation.composite)
-      .slice(0, 16);
+      .slice(0, 30);
     run.status = "curating";
     run.steps.push(step("Reranking finalists", `Head-to-head comparison of the top ${finalists.length}`));
     const reranked = await pairwiseRerank(finalists, brief);
@@ -132,9 +133,15 @@ export async function runPipeline(run: Run): Promise<Run> {
     const recommended = evaluated.filter((p) => p.evaluation.verdict !== "pass").length;
     run.steps.push(step("Evaluation complete", `${recommended} cleared the bar`));
 
-    // 6. CURATION
+    // 6. CURATION — target a fuller collection (20-30 products).
     run.steps.push(step("Curating the collection", "Diversity + editorial frame"));
-    const collection = await curate(evaluated, brief, 8);
+    const collection = await curate(evaluated, brief, 25);
+
+    // 7. RESOLVE LINKS — for the final products only, turn any Google Shopping
+    //    links into direct retailer product pages so every "View product" is buyable.
+    run.steps.push(step("Resolving retailer links", "Finding direct product pages"));
+    collection.products = await resolveRetailerLinks(collection.products);
+
     run.collection = collection;
     run.status = "done";
     run.steps.push(step("Collection ready", `${collection.products.length} products curated`));

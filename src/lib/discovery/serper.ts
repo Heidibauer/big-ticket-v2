@@ -57,15 +57,17 @@ export async function serperShopping(
   return items
     .filter((it) => it.title)
     .map((it, i): ProductCandidate => {
-      // Prefer a direct retailer URL. productLink is the real page when present;
-      // otherwise the main link, unless it's a Google Shopping redirect.
-      const candidateUrl =
+      // Prefer a direct retailer URL (productLink, then a non-Google link).
+      // Fall back to whatever link we have so we never drop a real product just
+      // because Serper only gave a Google Shopping URL (still US-buyable).
+      const retailerUrl =
         it.productLink && !isGoogleLink(it.productLink)
           ? it.productLink
           : it.link && !isGoogleLink(it.link)
           ? it.link
           : null;
-      const host = candidateUrl ? retailerFromUrl(candidateUrl) : null;
+      const candidateUrl = retailerUrl || it.productLink || it.link || "";
+      const host = retailerUrl ? retailerFromUrl(retailerUrl) : null;
       return {
         id: `serper-shop-${themeId}-${i}-${Math.random().toString(36).slice(2, 7)}`,
         title: it.title!.trim(),
@@ -83,13 +85,14 @@ export async function serperShopping(
         source: "serper-shopping",
       };
     })
-    // Require a real, buyable retailer URL AND an image. This guarantees every
-    // surfaced product links to a US retailer page and shows a picture. Items
-    // that are only a Google Shopping link, or have no image, are dropped.
+    // Keep real, buyable products: must have a link and a price, and not be a
+    // blocked marketplace or an editorial/roundup domain. We do NOT require an
+    // image or a non-Google link here, so we don't drop legitimate products;
+    // images render when present, and links still lead to US retailers.
     .filter(
       (p) =>
         p.url &&
-        !!p.imageUrl &&
+        p.price != null &&
         isAcceptableRetailer(retailerFromUrl(p.url)) &&
         !isArticleHost(retailerFromUrl(p.url))
     );

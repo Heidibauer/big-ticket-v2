@@ -92,6 +92,10 @@ export interface Run {
   error?: string;
   createdAt: string;
   mode: "live" | "mock";
+  // Internal staging state so the pipeline can run one stage per request and
+  // resume from where it left off. Not shown in the UI.
+  discovered?: ProductCandidate[];
+  evaluated?: EvaluatedProduct[];
 }
 
 export interface Feedback {

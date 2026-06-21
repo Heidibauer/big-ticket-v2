@@ -1,27 +1,25 @@
 import { NextResponse } from "next/server";
 import { ensureSchema, getRun } from "@/lib/db";
-import { runPipeline } from "@/lib/agents/orchestrator";
+import { advanceRun } from "@/lib/agents/orchestrator";
 
 export const runtime = "nodejs";
-export const maxDuration = 300; // pipeline runs inline within this request
+export const maxDuration = 60; // one stage only; finishes in a few seconds
 
-// Runs the pipeline for an existing queued run, to completion, within this
-// request. The run page calls this exactly once after navigating. Because the
-// work is awaited inside a real request (not a fire-and-forget background task),
-// it reliably finishes and writes a terminal status the poller can see.
+// Advances the run by exactly ONE stage and returns. The client calls this
+// repeatedly (once per poll) until the run is terminal. Keeping each request
+// short avoids the serverless termination that long-running requests hit.
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   try {
     await ensureSchema();
     const run = await getRun(params.id);
     if (!run) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-    // Only process queued runs; ignore duplicate triggers.
-    if (run.status !== "queued") {
-      return NextResponse.json({ id: run.id, status: run.status });
+    if (run.status === "done" || run.status === "error") {
+      return NextResponse.json({ id: run.id, status: run.status, more: false });
     }
 
-    await runPipeline(run);
-    return NextResponse.json({ id: run.id, status: run.status });
+    const more = await advanceRun(run);
+    return NextResponse.json({ id: run.id, status: run.status, more });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "process failed";
     return NextResponse.json({ error: msg }, { status: 500 });

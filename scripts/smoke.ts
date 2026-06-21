@@ -5,7 +5,7 @@
 process.env.DISCOVERY_MODE = "mock";
 delete process.env.ANTHROPIC_API_KEY; // force heuristic path so it's deterministic-ish
 
-import { newRun, runPipeline } from "../src/lib/agents/orchestrator";
+import { newRun, advanceRun } from "../src/lib/agents/orchestrator";
 import { reviewStrength, priceFit } from "../src/lib/scoring/signals";
 
 function assert(cond: boolean, msg: string) {
@@ -34,7 +34,11 @@ async function main() {
     budgetMax: 450,
   });
 
-  await runPipeline(run);
+  // Drive the staged pipeline to completion, exactly like the server does.
+  let guard = 0;
+  while ((await advanceRun(run)) && guard++ < 10) {
+    /* advance one stage at a time */
+  }
 
   assert(run.status === "done", `pipeline finished (status=${run.status})`);
   assert(run.themes.length > 0, `themes generated (${run.themes.length})`);

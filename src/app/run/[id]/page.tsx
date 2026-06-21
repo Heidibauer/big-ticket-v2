@@ -10,13 +10,17 @@ export default function RunPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [run, setRun] = useState<Run | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [procErr, setProcErr] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    let timer: ReturnType<typeof setTimeout>;
-    let triggered = false;
 
-    async function poll() {
+    // Drive the pipeline one stage at a time. Each /process call does a single
+    // short stage and tells us whether more work remains. We keep calling until
+    // the run is terminal. This avoids any long-running request, which is what
+    // was getting killed on the server before.
+    async function drive() {
+      // First load current state.
       try {
         const res = await fetch(`/api/runs/${id}`, { cache: "no-store" });
         if (res.status === 404) {
@@ -26,24 +30,38 @@ export default function RunPage({ params }: { params: { id: string } }) {
         const data: Run = await res.json();
         if (!alive) return;
         setRun(data);
-
-        // Kick off processing exactly once if the run is still queued. The
-        // /process endpoint awaits the pipeline inside a real request, so it
-        // reliably runs to completion (no dependence on background execution).
-        if (data.status === "queued" && !triggered) {
-          triggered = true;
-          fetch(`/api/runs/${id}/process`, { method: "POST" }).catch(() => {});
-        }
-
-        if (!TERMINAL.includes(data.status)) timer = setTimeout(poll, 1500);
+        if (data.status === "done" || data.status === "error") return;
       } catch {
-        if (alive) timer = setTimeout(poll, 2500);
+        if (alive) setTimeout(drive, 2500);
+        return;
+      }
+
+      // Advance one stage.
+      try {
+        const r = await fetch(`/api/runs/${id}/process`, { method: "POST" });
+        const body = await r.json().catch(() => ({}));
+        if (!alive) return;
+        if (!r.ok) {
+          setProcErr(body.error || `process failed (${r.status})`);
+        }
+        // Refresh displayed state after the stage.
+        const res2 = await fetch(`/api/runs/${id}`, { cache: "no-store" });
+        const data2: Run = await res2.json();
+        if (!alive) return;
+        setRun(data2);
+        if (data2.status !== "done" && data2.status !== "error") {
+          setTimeout(drive, 600);
+        }
+      } catch (e) {
+        if (!alive) return;
+        // Transient: retry the stage after a short pause.
+        setTimeout(drive, 2500);
       }
     }
-    poll();
+
+    drive();
     return () => {
       alive = false;
-      clearTimeout(timer);
     };
   }, [id]);
 
@@ -84,6 +102,9 @@ export default function RunPage({ params }: { params: { id: string } }) {
           {run.steps.length === 0 && <span className="muted small">Starting…</span>}
         </div>
         {run.error && <div className="banner" style={{ marginTop: 12 }}>{run.error}</div>}
+        {procErr && !run.error && (
+          <div className="banner" style={{ marginTop: 12 }}>Processing error: {procErr}</div>
+        )}
       </div>
 
       {/* Themes */}

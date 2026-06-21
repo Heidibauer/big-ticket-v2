@@ -8,18 +8,20 @@ import type { Evaluation, ProductCandidate, DiscoveryBrief } from "@/lib/types";
 import { reviewStrength, priceFit, dataCompleteness, credibilityScore } from "./signals";
 
 export interface TasteScores {
+  intentMatch: number; // 0-100: how well it matches the brief's explicit must-haves
   aesthetics: number;
   value: number;
   quality: number;
   desirability: number;
   trendFit: number;
   rationale: string;
+  matchReason?: string;
   redFlags: string[];
   collectionRole: string;
 }
 
-// Weights for the six judgment axes in the composite. Tuned to Big Ticket's
-// priorities: desirability + aesthetics lead, credibility + value keep it honest.
+// Weights among the TASTE axes (applied only after a product has cleared the
+// intent gate). Desirability + aesthetics lead; credibility + value keep it honest.
 const AXIS_WEIGHTS = {
   desirability: 0.26,
   aesthetics: 0.22,
@@ -28,6 +30,13 @@ const AXIS_WEIGHTS = {
   credibility: 0.12,
   trendFit: 0.09,
 };
+
+// Intent gate thresholds. A product that doesn't actually match what the user
+// asked for cannot rank well, no matter how nice it is on its own.
+const INTENT_PASS = 60; // below this, the product failed the brief's must-have
+const INTENT_HARD_CAP = 38; // failing products are capped here (lands in "pass")
+// How much the final score is intent vs. taste, for products that DO match.
+const INTENT_WEIGHT = 0.55;
 
 export function fuse(
   product: ProductCandidate,
@@ -46,7 +55,9 @@ export function fuse(
   const quality = blend(taste.quality, signalScores.reviewStrength, 0.55);
   const cred = blend(credibility, signalScores.reviewStrength, 0.7);
 
+  const intentMatch = clamp(taste.intentMatch);
   const scores = {
+    intentMatch,
     aesthetics: clamp(taste.aesthetics),
     value: clamp(value),
     quality: clamp(quality),
@@ -55,7 +66,8 @@ export function fuse(
     credibility: clamp(cred),
   };
 
-  let composite =
+  // 1. Taste sub-score: how good the product is on its own merits.
+  let taste0 =
     scores.desirability * AXIS_WEIGHTS.desirability +
     scores.aesthetics * AXIS_WEIGHTS.aesthetics +
     scores.value * AXIS_WEIGHTS.value +
@@ -63,15 +75,25 @@ export function fuse(
     scores.credibility * AXIS_WEIGHTS.credibility +
     scores.trendFit * AXIS_WEIGHTS.trendFit;
 
-  // Confidence discount: if we know little about a product, pull its composite
-  // toward a neutral 50 so thin records can't top the ranking on vibes alone.
+  // Confidence discount on the taste sub-score only.
   const conf = signalScores.dataCompleteness / 100;
-  composite = composite * (0.7 + 0.3 * conf) + 50 * (1 - (0.7 + 0.3 * conf));
+  taste0 = taste0 * (0.7 + 0.3 * conf) + 50 * (1 - (0.7 + 0.3 * conf));
+  taste0 -= Math.min(20, taste.redFlags.length * 7);
+  taste0 = clamp(taste0);
 
-  // Red-flag penalty.
-  composite -= Math.min(20, taste.redFlags.length * 7);
-
-  composite = clamp(composite);
+  // 2. THE INTENT GATE. This is what makes "I asked for X and got X" true.
+  //    - If the product fails to match the explicit ask, it is hard-capped low
+  //      no matter how attractive it is on its own. A gorgeous plain toaster
+  //      cannot outrank a real patterned one when patterns were requested.
+  //    - If it matches, the final score is dominated by HOW WELL it matches,
+  //      with taste as the secondary tiebreaker among genuine matches.
+  let composite: number;
+  if (intentMatch < INTENT_PASS) {
+    // Failed the must-have: cap hard, scaled by how badly it missed.
+    composite = Math.min(INTENT_HARD_CAP, Math.round((intentMatch / INTENT_PASS) * INTENT_HARD_CAP));
+  } else {
+    composite = clamp(intentMatch * INTENT_WEIGHT + taste0 * (1 - INTENT_WEIGHT));
+  }
 
   const verdict: Evaluation["verdict"] =
     composite >= 72 ? "recommend" : composite >= 55 ? "consider" : "pass";
@@ -83,6 +105,7 @@ export function fuse(
     composite: Math.round(composite),
     verdict,
     rationale: taste.rationale,
+    matchReason: taste.matchReason,
     redFlags: taste.redFlags,
     collectionRole: taste.collectionRole,
   };

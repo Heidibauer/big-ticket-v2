@@ -24,22 +24,41 @@ export function llmAvailable(): boolean {
   return !!process.env.ANTHROPIC_API_KEY;
 }
 
-// Ask Claude and parse a single JSON object/array from the reply.
+// Ask Claude and parse a single JSON object/array from the reply. Optionally
+// attach images (by URL) so the model can judge how products actually LOOK,
+// which is essential for visual requirements like "patterned" or "colorful".
 export async function askJSON<T>(opts: {
   system: string;
   prompt: string;
   maxTokens?: number;
   temperature?: number;
+  images?: { url: string; label: string }[];
 }): Promise<T> {
   const c = getClient();
   if (!c) throw new Error("ANTHROPIC_API_KEY not set");
+
+  // Build a multimodal user message: each image is introduced by a text label
+  // (so the model can tie a picture to a product id) followed by the image.
+  type Block =
+    | { type: "text"; text: string }
+    | { type: "image"; source: { type: "url"; url: string } };
+  const content: string | Block[] =
+    opts.images && opts.images.length
+      ? [
+          ...opts.images.flatMap((img): Block[] => [
+            { type: "text", text: img.label },
+            { type: "image", source: { type: "url", url: img.url } },
+          ]),
+          { type: "text", text: opts.prompt },
+        ]
+      : opts.prompt;
 
   const msg = await c.messages.create({
     model: MODEL,
     max_tokens: opts.maxTokens ?? 2000,
     temperature: opts.temperature ?? 0.4,
     system: opts.system,
-    messages: [{ role: "user", content: opts.prompt }],
+    messages: [{ role: "user", content }],
   });
 
   const text = msg.content

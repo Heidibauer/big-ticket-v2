@@ -43,6 +43,7 @@ export interface ProductCandidate {
 export interface Evaluation {
   productId: string;
   scores: {
+    intentMatch: number; // how well it matches the brief's explicit must-haves
     aesthetics: number; // does it look like something people are proud to own
     value: number; // price-to-quality, fairness vs alternatives
     quality: number; // build, materials, durability signals
@@ -50,6 +51,7 @@ export interface Evaluation {
     trendFit: number; // alignment with current + timeless design direction
     credibility: number; // retailer + review trust
   };
+  matchReason?: string; // why it does/doesn't match the explicit requirement
   signalScores: {
     reviewStrength: number; // derived from rating + volume
     priceFit: number; // fit within the brief's budget band

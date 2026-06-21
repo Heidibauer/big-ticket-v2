@@ -3,8 +3,7 @@
 // new adapter and plug it in here without touching the agent pipeline.
 
 import type { ProductCandidate, Theme } from "@/lib/types";
-import { serperShopping, serperOrganic } from "./serper";
-import { tavilySearch, tavilyEnrich } from "./tavily";
+import { serperShopping } from "./serper";
 import { fixtureProducts } from "@/data/fixtures";
 import { resolveMode } from "./mode";
 import { retailerFromUrl } from "./retailers";
@@ -63,13 +62,12 @@ export async function discoverForTheme(theme: Theme): Promise<ProductCandidate[]
   // Live: fan out across queries and sources in parallel. Capped to keep the
   // total run well under the serverless time limit. Serper Shopping is fast and
   // gives us price+rating directly, so we lean on it and use fewer Tavily calls.
-  // Products come ONLY from Shopping results: those are real, buyable items
-  // with images, prices, and retailer info. Organic search returns articles and
-  // "best of" roundups (not purchasable), so we don't use it as a product
-  // source anymore. We run several Shopping queries for coverage.
+  // Products come ONLY from Shopping results: real, buyable items with images,
+  // prices, and retailer info. We cast a WIDE net here (high recall) and filter
+  // hard in the rerank stage. ~20 results per query, all queries in parallel.
   const tasks: Promise<ProductCandidate[]>[] = [];
   for (const q of theme.searchQueries.slice(0, 3)) {
-    tasks.push(serperShopping(q, theme.id, 16));
+    tasks.push(serperShopping(q, theme.id, 20));
   }
 
   const settled = await Promise.allSettled(tasks);
@@ -94,28 +92,14 @@ export async function discoverForTheme(theme: Theme): Promise<ProductCandidate[]
     return score(b) - score(a);
   });
 
-  // Enrich a few thin candidates, but never let enrichment hold up the run.
-  // Page extraction is the slowest external step, so we cap it AND race the
-  // whole batch against a short overall deadline. If it doesn't finish in time,
-  // we proceed with what we have. Serper Shopping already gives price+rating for
-  // most items, so enrichment is a nice-to-have, not a dependency.
-  const toEnrich = merged.filter((p) => !p.price || !p.snippet).slice(0, 3);
-  if (toEnrich.length) {
-    const enrichAll = Promise.allSettled(
-      toEnrich.map(async (p) => {
-        const { context, price } = await tavilyEnrich(p.url);
-        if (context && !p.snippet) p.snippet = context;
-        if (price && !p.price) p.price = price;
-      })
-    );
-    const deadline = new Promise<void>((resolve) => setTimeout(resolve, 9000));
-    await Promise.race([enrichAll, deadline]);
-  }
+  // No per-theme page enrichment: with many themes running in parallel it would
+  // dominate runtime, and Shopping already gives price + image + rating. We keep
+  // a wide set per theme (high recall) and let the rerank stage filter hard.
 
   // Attach brand guess from retailer host when missing.
   for (const p of merged) {
     if (!p.retailer) p.retailer = retailerFromUrl(p.url);
   }
 
-  return merged.slice(0, 24);
+  return merged.slice(0, 30);
 }

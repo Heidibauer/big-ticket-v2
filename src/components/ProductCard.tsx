@@ -10,11 +10,11 @@ function scoreColor(n: number): string {
 }
 
 const AXES: { key: keyof EvaluatedProduct["evaluation"]["scores"]; label: string }[] = [
+  { key: "intentMatch", label: "Match" },
   { key: "desirability", label: "Desire" },
   { key: "aesthetics", label: "Aesthetic" },
   { key: "value", label: "Value" },
   { key: "quality", label: "Quality" },
-  { key: "credibility", label: "Trust" },
   { key: "trendFit", label: "Trend" },
 ];
 
@@ -92,6 +92,12 @@ export default function ProductCard({
         <span className="role">{e.collectionRole}</span>
         <span className={`verdict ${e.verdict}`}>{e.verdict}</span>
       </div>
+
+      {e.matchReason && (
+        <div className="match-reason">
+          <span className="match-label">Match</span> {e.matchReason}
+        </div>
+      )}
 
       <p className="rationale">{e.rationale}</p>
 

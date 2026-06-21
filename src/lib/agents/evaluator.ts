@@ -10,11 +10,13 @@ import { reviewStrength, priceFit, credibilityScore } from "@/lib/scoring/signal
 
 interface RawEval {
   id: string;
+  intentMatch: number;
   aesthetics: number;
   value: number;
   quality: number;
   desirability: number;
   trendFit: number;
+  matchReason?: string;
   rationale: string;
   redFlags: string[];
   collectionRole: string;
@@ -43,15 +45,39 @@ export async function evaluateProducts(
     return products.map((p) => fuse(p, heuristicTaste(p, brief), brief));
   }
 
+  // The explicit requirement the operator asked for. This is the contract the
+  // output must honor. style + notes carry the look/feature must-haves.
+  const requirement = [brief.style, brief.notes].filter(Boolean).join(". ") || brief.category;
+
   const system = `${BIG_TICKET_TASTE}
 
-You are the Evaluator. Score each product on five taste axes (0-100):
-aesthetics, value, quality, desirability, trendFit. Be discerning: most products
-are average. Reserve 85+ for things that genuinely earn it. Write a specific,
-concrete rationale and assign a collectionRole (e.g. "the value pick", "the
-splurge", "the design statement", "the safe default", "the compact choice").
-Flag real problems in redFlags (generic design, dropship signals, weak reviews,
-overpriced, off-brief). ${feedbackBlock(feedback)}`;
+You are the Evaluator. The operator asked for a SPECIFIC thing, and your first
+and most important job is to judge whether each product ACTUALLY MATCHES that
+request. Matching the request matters MORE than how nice the product is.
+
+THE REQUEST (must-have): "${requirement}"
+Category: ${brief.category}
+
+You are given each product's PHOTO. Judge what you SEE, not just the title. A
+title like "Smeg 2 Slice Toaster" tells you nothing about whether it's patterned;
+the image does. Look at the actual product.
+
+Score each product on these axes (0-100):
+- intentMatch: How well does this product match the request "${requirement}"? Be
+  STRICT and literal. If the request asks for prints/patterns/florals/animals/
+  bright multicolor and the product is a SINGLE SOLID COLOR, intentMatch must be
+  LOW (under 35), no matter how attractive it is. A solid pastel toaster does NOT
+  match "bright patterned floral". Only give 80+ when the product clearly and
+  obviously has the requested attribute visible in the image.
+- aesthetics, value, quality, desirability, trendFit: normal taste axes, judged
+  in service of THIS request (a product that misses the request is not desirable
+  here even if it's objectively pretty).
+
+Also return matchReason: one short, concrete phrase on what makes it match or
+miss (e.g. "bold tropical leaf print, multicolor" or "solid pink, no pattern").
+Write a specific rationale and a collectionRole. Flag problems in redFlags.
+Be discerning: most products are average. Reserve 85+ for ones that earn it.
+${feedbackBlock(feedback)}`;
 
   // Split into batches and evaluate them ALL IN PARALLEL. Sequential awaits
   // were the main time sink (each Claude call is several seconds; 3-4 in a row
@@ -81,33 +107,44 @@ overpriced, off-brief). ${feedbackBlock(feedback)}`;
       )
       .join("\n");
 
-    const prompt = `Brief: ${brief.category} | audience: ${brief.audience} | style: ${brief.style} | budget $${brief.budgetMin}-${brief.budgetMax}${brief.notes ? ` | notes: ${brief.notes}` : ""}
+    const prompt = `Request to match: "${requirement}" | category: ${brief.category} | audience: ${brief.audience} | budget $${brief.budgetMin}-${brief.budgetMax}
+
+The images above are shown in product order; each is labeled with its id. Judge intentMatch from the IMAGE.
 
 Products:
 ${listing}
 
-Return JSON: {"evals":[{"id":"...","aesthetics":0-100,"value":0-100,"quality":0-100,"desirability":0-100,"trendFit":0-100,"rationale":"specific reason it does or doesn't deserve a spot","redFlags":["..."],"collectionRole":"..."}]}
+Return JSON: {"evals":[{"id":"...","intentMatch":0-100,"aesthetics":0-100,"value":0-100,"quality":0-100,"desirability":0-100,"trendFit":0-100,"matchReason":"short phrase: what makes it match or miss the request","rationale":"specific reason it does or doesn't deserve a spot","redFlags":["..."],"collectionRole":"..."}]}
 One entry per product id. No text outside JSON.`;
+
+    // Attach product images so the model judges the actual look (essential for
+    // visual requirements). Cap to keep payloads sane.
+    const images = batch
+      .filter((p) => p.imageUrl)
+      .map((p) => ({ url: p.imageUrl as string, label: `Product id ${p.id}: ${p.title}` }));
 
     const batchEvals: Evaluation[] = [];
     try {
       const out = await askJSON<{ evals: RawEval[] }>({
         system,
         prompt,
-        maxTokens: 3500,
-        temperature: 0.3,
+        images,
+        maxTokens: 4000,
+        temperature: 0.2,
       });
       const byId = new Map(out.evals.map((e) => [e.id, e]));
       for (const p of batch) {
         const e = byId.get(p.id);
         const taste: TasteScores = e
           ? {
+              intentMatch: typeof e.intentMatch === "number" ? e.intentMatch : 50,
               aesthetics: e.aesthetics,
               value: e.value,
               quality: e.quality,
               desirability: e.desirability,
               trendFit: e.trendFit,
               rationale: e.rationale,
+              matchReason: e.matchReason,
               redFlags: e.redFlags || [],
               collectionRole: e.collectionRole || "candidate",
             }
@@ -134,7 +171,22 @@ function heuristicTaste(p: ProductCandidate, brief: DiscoveryBrief): TasteScores
   if (cheapJunk) flags.push("priced well below the band, possible low quality");
   if ((p.reviewCount ?? 0) < 25 && p.rating != null) flags.push("thin review volume");
   if (/generic|basic|no-name|amazonbasics/i.test(`${p.title} ${p.brand ?? ""}`)) flags.push("generic / unbranded");
+
+  // No LLM/vision here, so we can only guess intentMatch from text. Look for the
+  // brief's descriptor words in the title/snippet; default neutral if unknown so
+  // the gate doesn't wrongly drop everything in a keyless/fallback run.
+  const reqWords = `${brief.style} ${brief.notes ?? ""}`
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .filter((w) => w.length > 3);
+  const hay = `${p.title} ${p.snippet ?? ""}`.toLowerCase();
+  const hits = reqWords.filter((w) => hay.includes(w)).length;
+  // The heuristic can't actually see the product, so it must not hard-fail items
+  // it simply can't assess. Default to passing the gate; only boost on a match.
+  const intentMatch = hits > 0 ? 78 : 65;
+
   return {
+    intentMatch,
     aesthetics: Math.round((cred * 0.5 + rs * 0.5) * (cheapJunk ? 0.7 : 1)),
     value: pf,
     quality: rs,

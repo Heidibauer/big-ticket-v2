@@ -14,30 +14,40 @@ interface RawTheme {
   trendSignal: Theme["trendSignal"];
 }
 
-export async function strategizeThemes(brief: DiscoveryBrief, count = 4): Promise<Theme[]> {
+export async function strategizeThemes(brief: DiscoveryBrief, count = 10): Promise<Theme[]> {
   if (!llmAvailable()) return fallbackThemes(brief, count);
 
   const system = `${BIG_TICKET_TASTE}
 
-You are the Theme Strategist. The operator has given a SPECIFIC brief, and the
-single most important job is to honor the EXACT look and requirements they asked
-for. If they ask for "bright patterned floral toasters," every theme must chase
-patterned/printed/colorful toasters, NOT generic good toasters.
+You are a senior interior-design researcher and trend analyst planning a deep,
+high-recall product search. Think like the research team at a top design
+publication crossed with a retrieval engineer: decompose the brief into MANY
+distinct angles so nothing relevant is missed, then we filter hard later.
+
+Your single most important job is to honor the EXACT look and requirements the
+operator asked for. If they ask for "bright patterned floral toasters," every
+angle must chase patterned/printed/colorful toasters, never generic good ones.
+
+Decompose the brief along several dimensions to maximize coverage:
+1. REQUIREMENT FAMILIES — different flavors of the requested look (e.g. for
+   patterned: floral/botanical, animal/jungle, geometric/color-block, abstract
+   art prints, themed/novelty, vintage/retro motifs).
+2. SPECIALTY SOURCES — makers/retailers known for that look. For patterned or
+   design-forward home goods: Anthropologie, MacKenzie-Childs, Williams Sonoma,
+   West Elm, Drew Barrymore Beautiful, Smeg collaborations, Etsy, Wayfair,
+   Crate & Barrel, Lenox, Cath Kidston, Anna Sui collabs. Pick the right ones
+   for THIS category.
+3. TREND ANGLES — what's currently rising in this space (e.g. "dopamine decor",
+   "grandmillennial", "maximalist kitchen", seasonal collections). Use real,
+   current design-trend language.
+4. PRICE TIERS — entry, mid, splurge within the budget band.
 
 Rules:
-- Read the category, style, and notes literally. Extract the concrete visual or
-  functional requirements (e.g. "prints, patterns, florals, jungle, animals,
-  bright multicolor"). These are MUST-HAVES, not suggestions.
-- Build themes around DIFFERENT families of that requirement so the final set has
-  real variety (e.g. for patterned products: "Floral & botanical prints",
-  "Animal & jungle motifs", "Bold geometric color-block").
-- Write search queries that a shopper would type to find products matching the
-  requirement EXACTLY. Use the operator's own descriptive words. Include
-  specialty makers/retailers known for that look when relevant (e.g. for
-  patterned/printed home goods: Anthropologie, MacKenzie-Childs, Smeg x Dolce &
-  Gabbana, Drew Barrymore Beautiful, Etsy, Williams Sonoma, West Elm).
-- Never default to generic queries like "best <category>" when the brief asks
-  for a specific look. "best toaster" would surface plain toasters and is wrong here.`;
+- Read category, style, and notes literally; treat the look as a MUST-HAVE.
+- Every search query must combine the category WITH the requested look, using the
+  operator's own descriptive words plus the specialty source or trend.
+- Never write generic "best <category>" queries; they surface plain products.
+- Aim for breadth: distinct angles that together cover the whole space.`;
 
   const requirement = [brief.style, brief.notes].filter(Boolean).join(". ");
   const prompt = `Brief:
@@ -49,13 +59,14 @@ Rules:
 
 The required look/requirement to honor exactly: "${requirement || brief.category}"
 
-Return ${count} themes as JSON:
-{"themes":[{"title":"short theme name tied to the required look","rationale":"why this theme matches the requirement (1-2 sentences, specific)","intent":"what the operator is actually trying to find","searchQueries":["3-4 concrete shopping queries that would surface products MATCHING THE REQUIRED LOOK, using the operator's own words and specialty retailers; include the category and the look descriptors together"],"trendSignal":"rising|evergreen|niche|fading"}]}
+Return ${count} DISTINCT themes as JSON (cover different requirement families,
+specialty sources, trend angles, and price tiers so together they map the whole space):
+{"themes":[{"title":"short theme name tied to the required look","rationale":"why this theme matches the requirement (1-2 sentences, specific)","intent":"what the operator is actually trying to find","searchQueries":["2-3 concrete shopping queries that would surface products MATCHING THE REQUIRED LOOK, using the operator's own words plus a specialty retailer or trend term; include the category and the look descriptors together"],"trendSignal":"rising|evergreen|niche|fading"}]}
 
-Every query must combine the category with the required look (e.g. "floral print toaster", "patterned colorful toaster Anthropologie"). No generic "best <category>" queries. No commentary outside JSON.`;
+Every query must combine the category with the required look (e.g. "floral print toaster", "patterned colorful toaster Anthropologie", "maximalist toaster West Elm"). No generic "best <category>" queries. Make the ${count} themes genuinely different from each other. No commentary outside JSON.`;
 
   try {
-    const out = await askJSON<{ themes: RawTheme[] }>({ system, prompt, maxTokens: 1800, temperature: 0.6 });
+    const out = await askJSON<{ themes: RawTheme[] }>({ system, prompt, maxTokens: 3000, temperature: 0.7 });
     return out.themes.slice(0, count).map((t, i) => ({
       id: `theme-${i}`,
       title: t.title,

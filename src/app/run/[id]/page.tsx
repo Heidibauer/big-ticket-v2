@@ -10,17 +10,17 @@ export default function RunPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [run, setRun] = useState<Run | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [procErr, setProcErr] = useState<string | null>(null);
+  const procErr: string | null = null;
 
+  // The run is produced synchronously by the create call. This page just loads
+  // and displays it (also handles direct links / refreshes). No polling, no
+  // driver loop. If a run is somehow still mid-flight, we refresh a few times.
   useEffect(() => {
     let alive = true;
+    let timer: ReturnType<typeof setTimeout>;
+    let tries = 0;
 
-    // Drive the pipeline one stage at a time. Each /process call does a single
-    // short stage and tells us whether more work remains. We keep calling until
-    // the run is terminal. This avoids any long-running request, which is what
-    // was getting killed on the server before.
-    async function drive() {
-      // First load current state.
+    async function load() {
       try {
         const res = await fetch(`/api/runs/${id}`, { cache: "no-store" });
         if (res.status === 404) {
@@ -30,38 +30,16 @@ export default function RunPage({ params }: { params: { id: string } }) {
         const data: Run = await res.json();
         if (!alive) return;
         setRun(data);
-        if (data.status === "done" || data.status === "error") return;
+        const done = data.status === "done" || data.status === "error";
+        if (!done && tries++ < 60) timer = setTimeout(load, 2000);
       } catch {
-        if (alive) setTimeout(drive, 2500);
-        return;
-      }
-
-      // Advance one stage.
-      try {
-        const r = await fetch(`/api/runs/${id}/process`, { method: "POST" });
-        const body = await r.json().catch(() => ({}));
-        if (!alive) return;
-        if (!r.ok) {
-          setProcErr(body.error || `process failed (${r.status})`);
-        }
-        // Refresh displayed state after the stage.
-        const res2 = await fetch(`/api/runs/${id}`, { cache: "no-store" });
-        const data2: Run = await res2.json();
-        if (!alive) return;
-        setRun(data2);
-        if (data2.status !== "done" && data2.status !== "error") {
-          setTimeout(drive, 600);
-        }
-      } catch (e) {
-        if (!alive) return;
-        // Transient: retry the stage after a short pause.
-        setTimeout(drive, 2500);
+        if (alive && tries++ < 60) timer = setTimeout(load, 2500);
       }
     }
-
-    drive();
+    load();
     return () => {
       alive = false;
+      clearTimeout(timer);
     };
   }, [id]);
 

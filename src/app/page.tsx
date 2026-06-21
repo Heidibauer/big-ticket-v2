@@ -85,7 +85,7 @@ export default function Home() {
 
         <div className="between">
           <button className="btn" onClick={start} disabled={loading}>
-            {loading ? <><span className="spinner" /> &nbsp;Running the agents…</> : "Discover products"}
+            {loading ? <><span className="spinner" /> &nbsp;Building your collection… (about a minute)</> : "Discover products"}
           </button>
           <a className="muted small" href="/runs">Past runs →</a>
         </div>

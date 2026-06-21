@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { ensureSchema, saveRun } from "@/lib/db";
-import { newRun } from "@/lib/agents/orchestrator";
+import { newRun, runPipeline } from "@/lib/agents/orchestrator";
 
 export const runtime = "nodejs";
+// The whole pipeline runs in this one request. It's bounded internally (parallel
+// evaluation, capped discovery, deadline on the editorial call) so it finishes
+// in roughly 30-60s, well within the Pro limit.
+export const maxDuration = 300;
 
 const BriefSchema = z.object({
   category: z.string().min(1),
@@ -14,20 +18,21 @@ const BriefSchema = z.object({
   notes: z.string().optional(),
 });
 
-// Create only persists a "queued" run and returns its id immediately. The
-// actual pipeline is run by POST /api/runs/[id]/process, which the run page
-// fires once. This avoids relying on background execution (waitUntil) surviving
-// after the response is sent, which was leaving runs stuck mid-pipeline.
 export async function POST(req: Request) {
   try {
     await ensureSchema();
     const body = await req.json();
     const brief = BriefSchema.parse(body);
+
     const run = newRun(brief);
-    await saveRun(run);
-    return NextResponse.json({ id: run.id, mode: run.mode, status: run.status });
+    await saveRun(run); // persist queued state first (so it's retrievable)
+
+    await runPipeline(run); // runs to completion, mutates run in place
+    await saveRun(run); // persist the finished run
+
+    return NextResponse.json(run);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "bad request";
-    return NextResponse.json({ error: msg }, { status: 400 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

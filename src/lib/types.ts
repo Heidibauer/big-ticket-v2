@@ -96,6 +96,10 @@ export interface Run {
   // resume from where it left off. Not shown in the UI.
   discovered?: ProductCandidate[];
   evaluated?: EvaluatedProduct[];
+  // Concurrency lock: set while a stage is running so overlapping /process
+  // calls don't double-run the same stage. Includes a timestamp so a stale
+  // lock (from a killed function) can be reclaimed.
+  processingAt?: string | null;
 }
 
 export interface Feedback {

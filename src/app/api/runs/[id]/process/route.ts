@@ -3,7 +3,10 @@ import { ensureSchema, getRun } from "@/lib/db";
 import { advanceRun } from "@/lib/agents/orchestrator";
 
 export const runtime = "nodejs";
-export const maxDuration = 60; // one stage only; finishes in a few seconds
+// One stage per call. Most finish in a few seconds; evaluate/curate make a
+// Claude call and can need more headroom (plus cold start). 300 is the ceiling
+// on Pro; each stage is bounded internally so it won't actually run that long.
+export const maxDuration = 300;
 
 // Advances the run by exactly ONE stage and returns. The client calls this
 // repeatedly (once per poll) until the run is terminal. Keeping each request

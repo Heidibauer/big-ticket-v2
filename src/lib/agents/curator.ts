@@ -71,24 +71,29 @@ export async function curate(
   let diversityNotes = describeDiversity(products, brief);
 
   if (llmAvailable() && products.length) {
-    try {
-      const out = await askJSON<{ title: string; editorialAngle: string; diversityNotes: string }>({
-        system: `${BIG_TICKET_TASTE}
+    // The editorial frame is a nice-to-have. Race it against a short deadline so
+    // curation always finishes fast and never causes a request timeout; if the
+    // LLM is slow we ship the (already solid) deterministic title and notes.
+    const framing = askJSON<{ title: string; editorialAngle: string; diversityNotes: string }>({
+      system: `${BIG_TICKET_TASTE}
 
 You are the Curator writing the editorial frame for a finished collection.
 Write in Big Ticket's voice: specific, warm, a little bold, no hype words, no em
 dashes. The title is 8 words or fewer.`,
-        prompt: `Brief: ${brief.category} | ${brief.audience} | ${brief.style} | $${brief.budgetMin}-${brief.budgetMax}
+      prompt: `Brief: ${brief.category} | ${brief.audience} | ${brief.style} | $${brief.budgetMin}-${brief.budgetMax}
 Collection (ranked):
-${products.map((p, i) => `${i + 1}. ${p.title} — ${p.brand || p.retailer} — $${p.price ?? "?"} — role: ${p.evaluation.collectionRole} — ${p.evaluation.composite}/100`).join("\n")}
+${products.map((p, i) => `${i + 1}. ${p.title} - ${p.brand || p.retailer} - $${p.price ?? "?"} - role: ${p.evaluation.collectionRole} - ${p.evaluation.composite}/100`).join("\n")}
 
 Return JSON: {"title":"...","editorialAngle":"2 sentences on the POV of this set","diversityNotes":"1-2 sentences on how the set spans price, brand, and style"}`,
-        maxTokens: 600,
-        temperature: 0.6,
-      });
-      if (out.title) title = out.title;
-      if (out.editorialAngle) editorialAngle = out.editorialAngle;
-      if (out.diversityNotes) diversityNotes = out.diversityNotes;
+      maxTokens: 600,
+      temperature: 0.6,
+    });
+    const deadline = new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000));
+    try {
+      const out = await Promise.race([framing, deadline]);
+      if (out && out.title) title = out.title;
+      if (out && out.editorialAngle) editorialAngle = out.editorialAngle;
+      if (out && out.diversityNotes) diversityNotes = out.diversityNotes;
     } catch {
       /* keep deterministic defaults */
     }

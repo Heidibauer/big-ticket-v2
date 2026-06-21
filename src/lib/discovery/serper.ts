@@ -83,9 +83,32 @@ export async function serperShopping(
         source: "serper-shopping",
       };
     })
-    // Drop items with no real retailer URL (e.g. only a Google Shopping link),
-    // and any blocked marketplaces. Real retailer pages come from organic/Tavily.
-    .filter((p) => p.url && isAcceptableRetailer(retailerFromUrl(p.url)));
+    // Require a real, buyable retailer URL AND an image. This guarantees every
+    // surfaced product links to a US retailer page and shows a picture. Items
+    // that are only a Google Shopping link, or have no image, are dropped.
+    .filter(
+      (p) =>
+        p.url &&
+        !!p.imageUrl &&
+        isAcceptableRetailer(retailerFromUrl(p.url)) &&
+        !isArticleHost(retailerFromUrl(p.url))
+    );
+}
+
+// Editorial / roundup domains that publish "best of" articles, not products.
+const ARTICLE_HOSTS = [
+  "bonappetit.com", "seriouseats.com", "nytimes.com", "wirecutter.com",
+  "cnn.com", "forbes.com", "goodhousekeeping.com", "thespruce.com",
+  "epicurious.com", "foodandwine.com", "tasteofhome.com", "reviewed.com",
+  "businessinsider.com", "buzzfeed.com", "people.com", "rtings.com",
+  "techradar.com", "cnet.com", "popularmechanics.com", "realsimple.com",
+  "marthastewart.com", "bhg.com", "architecturaldigest.com", "elledecor.com",
+  "housebeautiful.com", "apartmenttherapy.com", "kitchn.com", "delish.com",
+];
+function isArticleHost(host: string | null): boolean {
+  if (!host) return false;
+  const h = host.toLowerCase();
+  return ARTICLE_HOSTS.some((d) => h.endsWith(d));
 }
 
 interface SerperOrganicItem {

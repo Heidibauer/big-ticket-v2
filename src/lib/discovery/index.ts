@@ -63,14 +63,14 @@ export async function discoverForTheme(theme: Theme): Promise<ProductCandidate[]
   // Live: fan out across queries and sources in parallel. Capped to keep the
   // total run well under the serverless time limit. Serper Shopping is fast and
   // gives us price+rating directly, so we lean on it and use fewer Tavily calls.
+  // Products come ONLY from Shopping results: those are real, buyable items
+  // with images, prices, and retailer info. Organic search returns articles and
+  // "best of" roundups (not purchasable), so we don't use it as a product
+  // source anymore. We run several Shopping queries for coverage.
   const tasks: Promise<ProductCandidate[]>[] = [];
-  for (const q of theme.searchQueries.slice(0, 2)) {
-    // Shopping gives price/rating/image; organic gives direct retailer URLs.
-    tasks.push(serperShopping(q, theme.id, 12));
-    tasks.push(serperOrganic(`${q} buy`, theme.id, 6));
+  for (const q of theme.searchQueries.slice(0, 3)) {
+    tasks.push(serperShopping(q, theme.id, 16));
   }
-  // One more organic pass for DTC / editorial coverage.
-  tasks.push(serperOrganic(`best ${theme.title}`, theme.id, 6));
 
   const settled = await Promise.allSettled(tasks);
   const all: ProductCandidate[] = [];

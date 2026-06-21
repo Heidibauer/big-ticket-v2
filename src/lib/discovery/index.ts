@@ -77,16 +77,23 @@ export async function discoverForTheme(theme: Theme): Promise<ProductCandidate[]
     return score(b) - score(a);
   });
 
-  // Enrich only a few of the most promising thin candidates. Page extraction is
-  // the slowest step, so we keep this tight to protect the overall run time.
+  // Enrich a few thin candidates, but never let enrichment hold up the run.
+  // Page extraction is the slowest external step, so we cap it AND race the
+  // whole batch against a short overall deadline. If it doesn't finish in time,
+  // we proceed with what we have. Serper Shopping already gives price+rating for
+  // most items, so enrichment is a nice-to-have, not a dependency.
   const toEnrich = merged.filter((p) => !p.price || !p.snippet).slice(0, 3);
-  await Promise.allSettled(
-    toEnrich.map(async (p) => {
-      const { context, price } = await tavilyEnrich(p.url);
-      if (context && !p.snippet) p.snippet = context;
-      if (price && !p.price) p.price = price;
-    })
-  );
+  if (toEnrich.length) {
+    const enrichAll = Promise.allSettled(
+      toEnrich.map(async (p) => {
+        const { context, price } = await tavilyEnrich(p.url);
+        if (context && !p.snippet) p.snippet = context;
+        if (price && !p.price) p.price = price;
+      })
+    );
+    const deadline = new Promise<void>((resolve) => setTimeout(resolve, 9000));
+    await Promise.race([enrichAll, deadline]);
+  }
 
   // Attach brand guess from retailer host when missing.
   for (const p of merged) {

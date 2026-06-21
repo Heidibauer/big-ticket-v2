@@ -14,6 +14,7 @@ export default function RunPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
+    let triggered = false;
 
     async function poll() {
       try {
@@ -25,6 +26,15 @@ export default function RunPage({ params }: { params: { id: string } }) {
         const data: Run = await res.json();
         if (!alive) return;
         setRun(data);
+
+        // Kick off processing exactly once if the run is still queued. The
+        // /process endpoint awaits the pipeline inside a real request, so it
+        // reliably runs to completion (no dependence on background execution).
+        if (data.status === "queued" && !triggered) {
+          triggered = true;
+          fetch(`/api/runs/${id}/process`, { method: "POST" }).catch(() => {});
+        }
+
         if (!TERMINAL.includes(data.status)) timer = setTimeout(poll, 1500);
       } catch {
         if (alive) timer = setTimeout(poll, 2500);

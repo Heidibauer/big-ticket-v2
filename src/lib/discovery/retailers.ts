@@ -14,10 +14,22 @@ const TIER_2 = [
   "walmart.com", "overstock.com", "houzz.com", "luluandgeorgia.com", "burrow.com",
   "floyddetroit.com", "thuma.co", "castlery.com", "joybird.com", "allmodern.com",
   "wayfair.ca", "made.com", "muji.com", "ikea.com", "abccarpet.com",
+  // Quality home/kitchen + department stores commonly carrying patterned goods.
+  "anthropologie.com", "mackenzie-childs.com", "lenox.com", "surlatable.com",
+  "kohls.com", "qvc.com", "saksfifthavenue.com", "neimanmarcus.com",
 ];
 
-// Marketplaces / aggregators we keep but treat with mild caution.
-const CAUTION = ["aliexpress.com", "temu.com", "etsy.com", "ebay.com", "dhgate.com"];
+// Etsy is a marketplace but sells NEW handmade/print goods, so allowed (low tier).
+const CAUTION = ["etsy.com"];
+
+// USED-GOODS / RESALE / low-trust marketplaces. We never send users here for a
+// "buy this product" link: listings are often used, third-party, or transient.
+const USED_OR_RESALE = [
+  "ebay.com", "poshmark.com", "mercari.com", "depop.com", "facebook.com",
+  "offerup.com", "craigslist.org", "etsy.com/listing", // (used vintage on etsy varies)
+  "aliexpress.com", "temu.com", "dhgate.com", "wish.com", "alibaba.com",
+  "shein.com", "kijiji.ca", "letgo.com", "vinted.com",
+];
 
 export function retailerFromUrl(url: string): string | null {
   try {
@@ -53,21 +65,39 @@ export function retailerLabel(host: string | null): string | null {
   return map[host] || host.replace(/\.com$|\.co$/, "").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// 0-100 credibility score for a retailer host.
+export function isUsedOrResale(host: string | null): boolean {
+  if (!host) return false;
+  const h = host.toLowerCase();
+  return USED_OR_RESALE.some((d) => h.endsWith(d) || h.includes(d));
+}
+
+// 0-100 credibility score for a retailer host. Used-goods/resale sites score
+// very low so they never win link selection or ranking.
 export function retailerCredibility(host: string | null): number {
   if (!host) return 40;
   const h = host.toLowerCase();
+  if (isUsedOrResale(h)) return 10;
   if (TIER_1.some((d) => h.endsWith(d))) return 92;
   if (TIER_2.some((d) => h.endsWith(d))) return 78;
-  if (CAUTION.some((d) => h.endsWith(d))) return 45;
+  if (CAUTION.some((d) => h.endsWith(d))) return 50;
   // Unknown brand DTC sites are plausibly fine; give a neutral-positive score.
-  return 60;
+  return 62;
+}
+
+// Retailer priority for choosing among multiple links for the SAME product.
+// Higher = preferred. This is what stops eBay from winning over Williams Sonoma.
+export function retailerPriority(host: string | null): number {
+  if (!host) return 0;
+  const h = host.toLowerCase();
+  if (isUsedOrResale(h)) return -100; // never prefer resale/used
+  if (TIER_1.some((d) => h.endsWith(d))) return 100;
+  if (TIER_2.some((d) => h.endsWith(d))) return 80;
+  if (CAUTION.some((d) => h.endsWith(d))) return 40;
+  return 60; // unknown DTC
 }
 
 export function isAcceptableRetailer(host: string | null): boolean {
-  // We don't hard-block much; the evaluator handles nuance. We only drop the
-  // obviously junky aggregators that flood discovery with dropship clones.
   if (!host) return false;
-  const blocked = ["aliexpress.com", "dhgate.com", "temu.com"];
-  return !blocked.some((d) => host.toLowerCase().endsWith(d));
+  // Hard-block used-goods / resale / low-trust marketplaces everywhere.
+  return !isUsedOrResale(host);
 }

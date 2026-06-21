@@ -8,7 +8,7 @@
 
 import type { EvaluatedProduct } from "@/lib/types";
 import { serperOrganic } from "./serper";
-import { retailerFromUrl } from "./retailers";
+import { retailerFromUrl, retailerPriority, isUsedOrResale } from "./retailers";
 
 function isGoogle(url: string): boolean {
   try {
@@ -27,20 +27,27 @@ export async function resolveRetailerLinks(
   const work = Promise.allSettled(
     needsFix.map(async (p) => {
       const q = `${p.title} ${p.retailer || ""}`.trim();
-      const results = await serperOrganic(q, "resolve", 8);
-      // CRITICAL: only swap the link if the result is confidently THE SAME
-      // product. A wrong-but-real link is worse than a correct Google link.
-      const hit = results.find((r) => {
-        const host = retailerFromUrl(r.url);
-        if (!host || host.startsWith("google.")) return false;
-        if (!isLikelyProductPage(r.url)) return false;
-        return isSameProduct(p.title, p.brand, r.title || "");
-      });
-      if (hit) {
-        p.url = hit.url;
-        if (!p.retailer) p.retailer = retailerFromUrl(hit.url);
+      const results = await serperOrganic(q, "resolve", 10);
+      // Collect ALL confident, real-retailer, same-product matches, then pick
+      // the BEST retailer (Tier-1 first). This stops eBay/resale from winning.
+      const candidates = results
+        .map((r) => ({ url: r.url, host: retailerFromUrl(r.url), title: r.title || "" }))
+        .filter(
+          (c) =>
+            c.host &&
+            !c.host.startsWith("google.") &&
+            !isUsedOrResale(c.host) && // never used-goods / resale
+            isLikelyProductPage(c.url) &&
+            isSameProduct(p.title, p.brand, c.title)
+        )
+        .sort((a, b) => retailerPriority(b.host) - retailerPriority(a.host));
+
+      const best = candidates[0];
+      if (best) {
+        p.url = best.url;
+        p.retailer = retailerFromUrl(best.url);
       }
-      // If no confident match, we leave p.url as-is (the original link).
+      // If no confident, quality match, leave p.url as-is (the original link).
     })
   );
 

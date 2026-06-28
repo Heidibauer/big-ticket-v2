@@ -141,7 +141,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="container">
       <div className="brand" style={{ marginBottom: 22 }}>
-        <a href="/" style={{ textDecoration: "none" }}><Logo height={32} /></a>
+        <a href="/" style={{ textDecoration: "none" }}><Logo height={38} /></a>
       </div>
       {children}
     </div>

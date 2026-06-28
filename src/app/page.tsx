@@ -46,7 +46,7 @@ export default function Home() {
   return (
     <div className="container">
       <div className="brand" style={{ marginBottom: 22 }}>
-        <Logo height={34} />
+        <Logo height={40} />
       </div>
 
       <div className="hero fade-up">

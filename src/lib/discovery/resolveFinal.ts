@@ -102,9 +102,14 @@ async function isReachable(url: string): Promise<boolean> {
       signal: controller.signal,
       headers: { "User-Agent": "Mozilla/5.0 (compatible; BigTicketBot/1.0)" },
     });
-    return res.status >= 200 && res.status < 400;
+    // Many retailers block bots with 403/405/429 even though the page is valid,
+    // so we only reject codes that genuinely mean the page is gone.
+    if (res.status === 404 || res.status === 410) return false;
+    return true;
   } catch {
-    return false;
+    // Network error / abort: don't assume dead; allow it (better a live-but-
+    // unverified retailer link than falling back to Google).
+    return true;
   } finally {
     clearTimeout(timer);
   }
@@ -135,23 +140,16 @@ function isSameProduct(origTitle: string, brand: string | null, resultTitle: str
   const res = norm(resultTitle);
   if (!res) return false;
 
-  if (brand) {
-    const b = norm(brand);
-    if (b && !res.includes(b)) return false;
-  }
-
   const origTokens = orig.split(" ");
   const resTokens = new Set(res.split(" "));
 
-  // Any distinctive variant token (color/pattern word, or a model token with a
-  // digit) present in the original MUST also be in the result.
-  const distinctive = origTokens.filter(
-    (w) => COLOR_PATTERN_WORDS.includes(w) || /\d/.test(w)
-  );
-  for (const d of distinctive) {
-    // model tokens: allow substring match (e.g. "tsf01" within a longer sku)
-    const present = [...resTokens].some((t) => t === d || t.includes(d) || d.includes(t));
-    if (!present) return false;
+  // HARD GUARD (keeps wrong-variant links out): any COLOR/PATTERN word in the
+  // original must also be in the result. This is what stops a pink product from
+  // resolving to a silver page. Model-number tokens are a soft signal, not a
+  // hard requirement (retailer titles often omit the SKU).
+  const colorWords = origTokens.filter((w) => COLOR_PATTERN_WORDS.includes(w));
+  for (const d of colorWords) {
+    if (![...resTokens].some((t) => t === d || t.includes(d) || d.includes(t))) return false;
   }
 
   // Strong overlap on the remaining meaningful words.
@@ -159,7 +157,7 @@ function isSameProduct(origTitle: string, brand: string | null, resultTitle: str
   const words = origTokens.filter((w) => w.length > 2 && !stop.has(w));
   if (words.length === 0) return false;
   const hits = words.filter((w) => resTokens.has(w) || res.includes(w)).length;
-  return hits / words.length >= 0.7;
+  return hits / words.length >= 0.5;
 }
 
 function isLikelyProductPage(url: string): boolean {

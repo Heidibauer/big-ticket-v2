@@ -4,9 +4,9 @@ import { useState } from "react";
 import type { EvaluatedProduct, DiscoveryBrief } from "@/lib/types";
 
 function scoreColor(n: number): string {
-  if (n >= 72) return "#57c98a";
-  if (n >= 55) return "#e2b04a";
-  return "#e2685f";
+  if (n >= 72) return "linear-gradient(120deg,#53c9ee,#5e1eb9)";
+  if (n >= 55) return "linear-gradient(120deg,#7c8bff,#403ec6)";
+  return "linear-gradient(120deg,#bdbdc7,#8a8a93)";
 }
 
 const AXES: { key: keyof EvaluatedProduct["evaluation"]["scores"]; label: string }[] = [
@@ -54,78 +54,70 @@ export default function ProductCard({
   }
 
   return (
-    <div className="card">
-      {product.imageUrl && (
-        <div className="card-image">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+    <div className="card fade-up">
+      <div className="card-image">
+        <span className="card-rank-badge">#{rank}</span>
+        {product.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={product.imageUrl}
             alt={product.title}
             loading="lazy"
             onError={(ev) => {
-              // Hide broken images gracefully.
-              (ev.currentTarget.parentElement as HTMLElement).style.display = "none";
+              (ev.currentTarget as HTMLImageElement).style.display = "none";
             }}
           />
-        </div>
-      )}
-      <div className="card-top">
-        <div>
-          <div className="rank">#{rank}</div>
-          <h3>{product.title}</h3>
-          <div className="meta">
-            {[product.brand, product.retailer, product.price != null ? `$${product.price}` : null]
-              .filter(Boolean)
-              .join(" · ")}
-            {product.rating != null && ` · ${product.rating}★ (${product.reviewCount ?? 0})`}
+        ) : null}
+      </div>
+
+      <div className="card-body">
+        <div className="card-top">
+          <div>
+            <h3>{product.title}</h3>
+            <div className="meta">
+              {[product.brand, product.retailer, product.price != null ? `$${product.price}` : null]
+                .filter(Boolean)
+                .join(" · ")}
+              {product.rating != null && ` · ${product.rating}★ (${product.reviewCount ?? 0})`}
+            </div>
+          </div>
+          <div className="score-badge" style={{ background: scoreColor(e.composite) }}>
+            {e.composite}
           </div>
         </div>
-        <div
-          className="score-badge"
-          style={{ borderColor: scoreColor(e.composite), color: scoreColor(e.composite) }}
-        >
-          {e.composite}
+
+        <div className="row">
+          <span className="role">{e.collectionRole}</span>
+          <span className={`verdict ${e.verdict}`}>{e.verdict}</span>
         </div>
-      </div>
 
-      <div className="row">
-        <span className="role">{e.collectionRole}</span>
-        <span className={`verdict ${e.verdict}`}>{e.verdict}</span>
-      </div>
+        {e.matchReason && (
+          <div className="match-reason">
+            <span className="match-label">Why it fits</span> {e.matchReason}
+          </div>
+        )}
 
-      {e.matchReason && (
-        <div className="match-reason">
-          <span className="match-label">Match</span> {e.matchReason}
-        </div>
-      )}
+        <p className="rationale">{e.rationale}</p>
 
-      <p className="rationale">{e.rationale}</p>
-
-      <div className="axes">
-        {AXES.map((a) => {
-          const v = e.scores[a.key];
-          return (
-            <div className="axis" key={a.key}>
-              {a.label} <b>{v}</b>
-              <div className="bar">
-                <span style={{ width: `${v}%` }} />
+        <div className="axes">
+          {AXES.map((a) => {
+            const v = e.scores[a.key];
+            return (
+              <div className="axis" key={a.key}>
+                {a.label} <b>{v}</b>
+                <div className="bar">
+                  <span style={{ width: `${v}%` }} />
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
-      {e.redFlags.length > 0 && (
-        <div className="flags">⚠ {e.redFlags.join(" · ")}</div>
-      )}
+        {e.redFlags.length > 0 && <div className="flags">⚠ {e.redFlags.join(" · ")}</div>}
+      </div>
 
       <div className="card-foot">
-        <a
-          className="btn-ghost"
-          href={product.url}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a className="view-link" href={product.url} target="_blank" rel="noopener noreferrer">
           View product →
         </a>
         <div className="feedback-row">
@@ -133,7 +125,7 @@ export default function ProductCard({
             className={`btn-ghost ${signal === "love" ? "active-love" : ""}`}
             disabled={busy}
             onClick={() => sendFeedback("love")}
-            title="Teach the system this is the kind of product we want"
+            title="Save this to teach the system your taste"
           >
             ♥ Love
           </button>
@@ -141,7 +133,7 @@ export default function ProductCard({
             className={`btn-ghost ${signal === "pass" ? "active-pass" : ""}`}
             disabled={busy}
             onClick={() => sendFeedback("pass")}
-            title="Teach the system to avoid products like this"
+            title="Not for me"
           >
             ✕ Pass
           </button>

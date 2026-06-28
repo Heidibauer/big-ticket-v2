@@ -4,15 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 const PRESETS = [
-  { category: "coffee makers", audience: "first-time homebuyer, single woman, 30-45", style: "warm minimalist", budgetMin: 80, budgetMax: 450 },
-  { category: "sofas", audience: "first-time homebuyer couple, 28-38", style: "mid-century modern", budgetMin: 800, budgetMax: 2500 },
-  { category: "air purifiers", audience: "new parent, 30-40", style: "clean scandinavian", budgetMin: 150, budgetMax: 600 },
-  { category: "table lamps", audience: "interior designer curating for clients", style: "sculptural, editorial", budgetMin: 120, budgetMax: 700 },
+  { label: "🎨 Colorful patterned toasters", category: "toasters", audience: "design-loving home cook, 28-45", style: "bright, colorful, bold prints and patterns, florals, animals, anything but plain", budgetMin: 40, budgetMax: 300 },
+  { label: "☕ Warm minimalist coffee makers", category: "coffee makers", audience: "first-time homebuyer, single woman, 30-45", style: "warm minimalist", budgetMin: 80, budgetMax: 450 },
+  { label: "🛋️ Mid-century sofas", category: "sofas", audience: "first-time homebuyer couple, 28-38", style: "mid-century modern", budgetMin: 800, budgetMax: 2500 },
+  { label: "🌿 Sculptural table lamps", category: "table lamps", audience: "interior designer curating for clients", style: "sculptural, editorial", budgetMin: 120, budgetMax: 700 },
 ];
 
 export default function Home() {
   const router = useRouter();
-  const [form, setForm] = useState(PRESETS[0]);
+  const [form, setForm] = useState({ ...PRESETS[0] });
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -28,7 +28,10 @@ export default function Home() {
       const res = await fetch("/api/runs/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, notes: notes || undefined }),
+        body: JSON.stringify({
+          category: form.category, audience: form.audience, style: form.style,
+          budgetMin: form.budgetMin, budgetMax: form.budgetMax, notes: notes || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to start run");
@@ -41,62 +44,63 @@ export default function Home() {
 
   return (
     <div className="container">
-      <div className="brand">
-        <div className="brand-mark">BT</div>
-        <h1>Big Ticket — Product Discovery</h1>
+      <div className="brand" style={{ marginBottom: 22 }}>
+        <span className="brand-mark"><span className="c1" /><span className="c2" /></span>
+        <span className="wordmark">Big Ticket<span className="dot">.</span></span>
       </div>
-      <p className="subtitle">
-        An AI buyer, merchandiser, and curator. Give it a brief. It finds products worth owning.
-      </p>
 
-      <div className="panel">
+      <div className="hero fade-up">
+        <div className="tagline">Buy once. Buy well.</div>
+        <h1>Find products worth obsessing over.</h1>
+        <p>Tell us what you&apos;re hunting for. Our AI buyer scours real retailers, judges every option on looks, value, and reviews, and hands you a curated shortlist worth saving.</p>
+      </div>
+
+      <div className="panel fade-up" style={{ marginTop: 22, animationDelay: "0.05s" }}>
         <div className="grid2">
           <div className="field">
-            <label>Category</label>
-            <input value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="e.g. coffee makers" />
+            <label>What are you shopping for?</label>
+            <input value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="e.g. toasters" />
           </div>
           <div className="field">
-            <label>Audience</label>
+            <label>Who&apos;s it for?</label>
             <input value={form.audience} onChange={(e) => set("audience", e.target.value)} placeholder="who is this for" />
           </div>
         </div>
+        <div className="field">
+          <label>The vibe / must-haves</label>
+          <input value={form.style} onChange={(e) => set("style", e.target.value)} placeholder="e.g. bright, colorful, patterned" />
+        </div>
         <div className="grid2">
           <div className="field">
-            <label>Style</label>
-            <input value={form.style} onChange={(e) => set("style", e.target.value)} placeholder="e.g. warm minimalist" />
+            <label>Budget min ($)</label>
+            <input type="number" value={form.budgetMin} onChange={(e) => set("budgetMin", Number(e.target.value))} />
           </div>
-          <div className="grid2">
-            <div className="field">
-              <label>Budget min ($)</label>
-              <input type="number" value={form.budgetMin} onChange={(e) => set("budgetMin", Number(e.target.value))} />
-            </div>
-            <div className="field">
-              <label>Budget max ($)</label>
-              <input type="number" value={form.budgetMax} onChange={(e) => set("budgetMax", Number(e.target.value))} />
-            </div>
+          <div className="field">
+            <label>Budget max ($)</label>
+            <input type="number" value={form.budgetMax} onChange={(e) => set("budgetMax", Number(e.target.value))} />
           </div>
         </div>
         <div className="field">
-          <label>Notes (optional intent)</label>
-          <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="anything else the system should weigh" />
+          <label>Anything else? (optional)</label>
+          <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="the more specific, the better the results" />
         </div>
 
         {err && <div className="banner" style={{ marginBottom: 14 }}>{err}</div>}
 
         <div className="between">
           <button className="btn" onClick={start} disabled={loading}>
-            {loading ? <><span className="spinner" /> &nbsp;Building your collection… (about a minute)</> : "Discover products"}
+            {loading ? <><span className="spinner" /> Curating your shortlist…</> : <>✨ Find my products</>}
           </button>
-          <a className="muted small" href="/runs">Past runs →</a>
+          <a className="muted small" href="/runs" style={{ fontWeight: 700 }}>Past hunts →</a>
         </div>
       </div>
 
-      <div style={{ marginTop: 22 }}>
-        <div className="muted small" style={{ marginBottom: 10 }}>Quick briefs</div>
+      <div style={{ marginTop: 26 }}>
+        <div className="muted small" style={{ marginBottom: 12, fontWeight: 700 }}>Try a starting point</div>
         <div className="row">
           {PRESETS.map((p) => (
-            <button key={p.category} className="btn-ghost" onClick={() => setForm(p)}>
-              {p.category}
+            <button key={p.label} className="chip" onClick={() => { setForm({ ...p }); setNotes(""); }}>
+              {p.label}
             </button>
           ))}
         </div>

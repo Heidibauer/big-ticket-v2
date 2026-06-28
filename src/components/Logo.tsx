@@ -11,7 +11,7 @@ export function Logo({ height = 34 }: { height?: number }) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src="/logo.png"
+        src="/logo.svg"
         alt="Big Ticket"
         style={{ height, width: "auto", display: "block" }}
         onError={() => setImgOk(false)}

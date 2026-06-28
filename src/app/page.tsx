@@ -51,8 +51,8 @@ export default function Home() {
 
       <div className="hero fade-up">
         <div className="tagline">Buy once. Buy well.</div>
-        <h1>Find products worth obsessing over.</h1>
-        <p>Tell us what you&apos;re hunting for. Our AI buyer scours real retailers, judges every option on looks, value, and reviews, and hands you a curated shortlist worth saving.</p>
+        <h1>Discover pieces you&apos;ll love.</h1>
+        <p>Tell us what you have in mind. We&apos;ll search the best retailers, weigh every detail, and hand you a beautifully curated edit, the kind you&apos;ll actually want to save.</p>
       </div>
 
       <div className="panel fade-up" style={{ marginTop: 22, animationDelay: "0.05s" }}>
@@ -89,14 +89,14 @@ export default function Home() {
 
         <div className="between">
           <button className="btn" onClick={start} disabled={loading}>
-            {loading ? <><span className="spinner" /> Curating your shortlist…</> : <>✨ Find my products</>}
+            {loading ? <><span className="spinner" /> Curating your edit…</> : <>Curate my edit</>}
           </button>
-          <a className="muted small" href="/runs" style={{ fontWeight: 700 }}>Past hunts →</a>
+          <a className="muted small" href="/runs" style={{ fontWeight: 700 }}>Past edits →</a>
         </div>
       </div>
 
       <div style={{ marginTop: 26 }}>
-        <div className="muted small" style={{ marginBottom: 12, fontWeight: 700 }}>Try a starting point</div>
+        <div className="muted small" style={{ marginBottom: 12, fontWeight: 700 }}>Start with an idea</div>
         <div className="row">
           {PRESETS.map((p) => (
             <button key={p.label} className="chip" onClick={() => { setForm({ ...p }); setNotes(""); }}>

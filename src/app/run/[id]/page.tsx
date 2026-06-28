@@ -9,12 +9,12 @@ const TERMINAL = ["done", "error"];
 
 // Playful status copy so the wait feels like the system working FOR you.
 const STATUS_COPY: Record<string, string> = {
-  queued: "Warming up the research engine",
-  discovering: "Hunting across real retailers",
-  evaluating: "Judging looks, value, and reviews",
-  curating: "Curating your shortlist",
-  done: "Your shortlist is ready",
-  error: "Something went sideways",
+  queued: "Setting the table",
+  discovering: "Searching the best retailers",
+  evaluating: "Weighing looks, value, and reviews",
+  curating: "Composing your edit",
+  done: "Your edit is ready",
+  error: "A small hiccup",
 };
 
 export default function RunPage({ params }: { params: { id: string } }) {
@@ -43,7 +43,7 @@ export default function RunPage({ params }: { params: { id: string } }) {
     return () => { alive = false; clearTimeout(timer); };
   }, [id]);
 
-  if (notFound) return <Shell><div className="banner">We couldn&apos;t find that hunt.</div></Shell>;
+  if (notFound) return <Shell><div className="banner">We couldn&apos;t find that edit.</div></Shell>;
   if (!run) return <Shell><div className="row"><span className="spinner dark" /> <span className="muted">Loading…</span></div></Shell>;
 
   const working = !TERMINAL.includes(run.status);
@@ -52,7 +52,7 @@ export default function RunPage({ params }: { params: { id: string } }) {
     <Shell>
       <div className="between" style={{ marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
         <div>
-          <div className="muted small" style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Your hunt</div>
+          <div className="muted small" style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>Your edit</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: "var(--black)" }}>
             {run.brief.category} <span className="muted" style={{ fontWeight: 600 }}>·</span> {run.brief.style}
           </div>
@@ -108,7 +108,7 @@ export default function RunPage({ params }: { params: { id: string } }) {
       {run.collection && (
         <>
           <div className="collection-head fade-up">
-            <div className="tagline" style={{ color: "var(--deep-purple)", marginBottom: 8 }}>Your curated shortlist</div>
+            <div className="tagline" style={{ color: "var(--deep-purple)", marginBottom: 8 }}>Curated for you</div>
             <h2 className="gradient-text">{run.collection.title}</h2>
             <p className="muted" style={{ maxWidth: 740, fontSize: 15, lineHeight: 1.6 }}>{run.collection.editorialAngle}</p>
             <div className="small muted" style={{ marginTop: 6, fontWeight: 600 }}>{run.collection.diversityNotes}</div>
@@ -119,7 +119,7 @@ export default function RunPage({ params }: { params: { id: string } }) {
             ))}
           </div>
           <div style={{ textAlign: "center", marginTop: 32 }}>
-            <a href="/" className="btn">✨ Start a new hunt</a>
+            <a href="/" className="btn">Curate another edit</a>
           </div>
         </>
       )}

@@ -117,3 +117,12 @@ export async function exaScopedForProduct(
   const results = await exaSearchScoped(query, domains, "final", 8, "resolve");
   return results.map((r) => ({ url: r.url, title: r.title }));
 }
+
+// PRIMARY discovery: one Exa call per query across ALL prioritized retailers.
+// Returns products that already OWN their direct store link + image (no later
+// matching needed). One call per query keeps us well under the rate limit.
+export async function exaDiscover(query: string, themeId: string): Promise<ProductCandidate[]> {
+  if (!process.env.EXA_API_KEY) return [];
+  const domains = [...MAJOR_RETAILERS, ...BOUTIQUE_RETAILERS];
+  return exaSearchScoped(query, domains, themeId, 15, "discover");
+}

@@ -1,24 +1,31 @@
-// Big Ticket logo, recreated from the official mark: two interlocking circles
-// (cyan gradient + purple) and the lowercase "big ticket." wordmark.
-export function Logo({ height = 30 }: { height?: number }) {
+// Big Ticket logo: two interlocking circles (cyan gradient + purple) and the
+// lowercase "big ticket." wordmark in Montserrat, matching the official mark.
+export function Logo({ height = 34 }: { height?: number }) {
+  const d = height; // circle diameter ties to height
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", height }}>
-      <svg height={height} viewBox="0 0 320 96" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Big Ticket">
-        <defs>
-          <linearGradient id="bt-sky" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#4ad6f0" />
-            <stop offset="1" stopColor="#7b6cf0" />
-          </linearGradient>
-        </defs>
-        {/* left circle: cyan gradient */}
-        <circle cx="40" cy="48" r="40" fill="url(#bt-sky)" />
-        {/* right circle: deep purple, overlapping */}
-        <circle cx="96" cy="48" r="40" fill="#5e1eb9" fillOpacity="0.92" style={{ mixBlendMode: "multiply" }} />
-        {/* wordmark */}
-        <text x="150" y="64" fontFamily="Montserrat, sans-serif" fontWeight="800" fontSize="52" fill="#5e1eb9" letterSpacing="-1">
-          big ticket<tspan fill="#4ad6f0">.</tspan>
-        </text>
-      </svg>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: d * 0.34 }}>
+      <span style={{ position: "relative", width: d * 1.62, height: d, flex: "none" }}>
+        <span
+          style={{
+            position: "absolute", left: 0, top: 0, width: d, height: d, borderRadius: "50%",
+            background: "linear-gradient(135deg,#46d3f0 0%,#7a6cf0 100%)",
+          }}
+        />
+        <span
+          style={{
+            position: "absolute", left: d * 0.62, top: 0, width: d, height: d, borderRadius: "50%",
+            background: "#5e1eb9", mixBlendMode: "multiply",
+          }}
+        />
+      </span>
+      <span
+        style={{
+          fontFamily: "Montserrat, sans-serif", fontWeight: 700, fontSize: d * 0.92,
+          letterSpacing: "-0.02em", color: "#5e1eb9", lineHeight: 1,
+        }}
+      >
+        big ticket<span style={{ color: "#46d3f0" }}>.</span>
+      </span>
     </span>
   );
 }

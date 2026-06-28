@@ -63,6 +63,11 @@ title like "Smeg 2 Slice Toaster" tells you nothing about whether it's patterned
 the image does. Look at the actual product.
 
 Score each product on these axes (0-100):
+- categoryCheck: FIRST, is this product actually a "${brief.category}"? It must be
+  the real physical item, NOT something that merely depicts or decorates it. Wall
+  art, prints, posters, decals, stickers, fridge skins/wraps, lampshades-only,
+  digital downloads, greeting cards, and similar are NOT the product. If it is not
+  truly a "${brief.category}", set intentMatch to 0 and add a redFlag "wrong category".
 - intentMatch: How well does this product match the request "${requirement}"? Be
   STRICT and literal. If the request asks for prints/patterns/florals/animals/
   bright multicolor and the product is a SINGLE SOLID COLOR, intentMatch must be

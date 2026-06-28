@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Run } from "@/lib/types";
 import ProductCard from "@/components/ProductCard";
+import { Logo } from "@/components/Logo";
 
 const TERMINAL = ["done", "error"];
 
@@ -130,10 +131,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="container">
       <div className="brand" style={{ marginBottom: 22 }}>
-        <a href="/" className="brand-mark" style={{ textDecoration: "none" }}>
-          <span className="c1" /><span className="c2" />
-        </a>
-        <a href="/" style={{ textDecoration: "none" }}><span className="wordmark">Big Ticket<span className="dot">.</span></span></a>
+        <a href="/" style={{ textDecoration: "none" }}><Logo height={32} /></a>
       </div>
       {children}
     </div>

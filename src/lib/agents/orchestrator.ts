@@ -7,6 +7,7 @@ import { strategizeThemes } from "./themes";
 import { discoverForTheme } from "@/lib/discovery";
 import { isUsedOrResale, retailerFromUrl } from "@/lib/discovery/retailers";
 import { resolveFinalLinks } from "@/lib/discovery/resolveFinal";
+import { passesCategoryGate } from "@/lib/discovery/categoryGate";
 import { evaluateProducts } from "./evaluator";
 import { pairwiseRerank } from "./reranker";
 import { curate } from "./curator";
@@ -98,8 +99,13 @@ export async function runPipeline(run: Run): Promise<Run> {
     run.steps.push(step("Discovering products", `Searching ${themes.length} angles in parallel`));
     const discoveredRaw = (await Promise.all(themes.map((t) => discoverForTheme(t)))).flat();
     // Global dedupe across angles (same product can appear under several angles).
-    const discovered = dedupeAcrossThemes(discoveredRaw);
-    run.steps.push(step("Discovery complete", `${discovered.length} unique candidates from ${discoveredRaw.length} results`));
+    const deduped = dedupeAcrossThemes(discoveredRaw);
+    // CATEGORY GATE: drop items that match the look but are the wrong category
+    // (wall art, prints, decals, fridge skins, digital downloads, etc.). If the
+    // gate is too aggressive and leaves too few, fall back to the deduped set.
+    const gated = deduped.filter((p) => passesCategoryGate(p, brief));
+    const discovered = gated.length >= 8 ? gated : deduped;
+    run.steps.push(step("Discovery complete", `${discovered.length} on-category candidates from ${discoveredRaw.length} results`));
     if (discovered.length === 0) {
       run.status = "error";
       run.error = "No products discovered. Check API keys or broaden the brief.";

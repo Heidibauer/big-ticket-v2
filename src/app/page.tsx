@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Logo } from "@/components/Logo";
 
 const PRESETS = [
   { label: "🎨 Colorful patterned toasters", category: "toasters", audience: "design-loving home cook, 28-45", style: "bright, colorful, bold prints and patterns, florals, animals, anything but plain", budgetMin: 40, budgetMax: 300 },
@@ -45,8 +46,7 @@ export default function Home() {
   return (
     <div className="container">
       <div className="brand" style={{ marginBottom: 22 }}>
-        <span className="brand-mark"><span className="c1" /><span className="c2" /></span>
-        <span className="wordmark">Big Ticket<span className="dot">.</span></span>
+        <Logo height={34} />
       </div>
 
       <div className="hero fade-up">

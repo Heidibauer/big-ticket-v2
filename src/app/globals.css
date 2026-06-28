@@ -241,3 +241,28 @@ input:focus, textarea:focus {
 .link-quiet:hover { color: var(--deep-purple); text-decoration: underline; }
 .card-body { gap: 11px; }
 .role { display: none; }
+
+/* ---- Apple-style hierarchy polish ---- */
+.card { border-radius: 20px; border-color: #eceaf3; }
+.card-image { height: 240px; background: #fafafb; }
+.card-image img { padding: 18px; }
+.card-body { padding: 20px 20px 4px; gap: 14px; }
+.card h3 { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: #1d1d1f; line-height: 1.28; }
+.card .meta { font-size: 13px; color: #86868b; margin-top: 6px; font-weight: 500; }
+.score-badge { width: 48px; height: 48px; border-radius: 14px; font-size: 17px; font-weight: 700; }
+.match-reason {
+  background: #f6f3fd; border: none; border-radius: 12px; padding: 11px 13px;
+  font-size: 13px; line-height: 1.5; color: #3a3a3c;
+}
+.match-reason .match-label {
+  display: block; font-size: 10px; letter-spacing: 0.08em; margin-bottom: 3px; color: var(--deep-purple);
+}
+.rationale { font-size: 14px; line-height: 1.55; color: #4a4a4f; }
+.verdict-tag { font-size: 10.5px; padding: 5px 11px; }
+.card-foot { padding: 16px 20px; border-top: 1px solid #f1eff7; }
+.view-link { font-size: 13.5px; font-weight: 700; }
+.btn-ghost { padding: 9px 15px; border-radius: 12px; font-size: 13px; }
+
+/* Tighter, calmer collection header */
+.collection-head h2 { font-size: 30px; letter-spacing: -0.03em; }
+.cards { gap: 22px; margin-top: 24px; }

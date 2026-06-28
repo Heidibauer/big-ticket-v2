@@ -70,7 +70,7 @@ export async function curate(
 
   // 3. Editorial framing (LLM if available).
   let title = `${cap(brief.style)} ${brief.category}: the shortlist`;
-  let editorialAngle = `A curated set of ${brief.category} for ${brief.audience}, spanning value to splurge within $${brief.budgetMin}-${brief.budgetMax}.`;
+  let editorialAngle = `The standouts we'd actually buy, from value finds to the splurge worth it.`;
   let diversityNotes = describeDiversity(products, brief);
 
   if (llmAvailable() && products.length) {

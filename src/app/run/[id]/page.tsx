@@ -5,6 +5,7 @@ import type { Run } from "@/lib/types";
 import ProductCard from "@/components/ProductCard";
 import { Logo } from "@/components/Logo";
 
+function cap(x: string){return x.charAt(0).toUpperCase()+x.slice(1);}
 const TERMINAL = ["done", "error"];
 
 // Playful status copy so the wait feels like the system working FOR you.
@@ -50,14 +51,8 @@ export default function RunPage({ params }: { params: { id: string } }) {
 
   return (
     <Shell>
-      <div className="between" style={{ marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div className="muted small" style={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em" }}>You searched for</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: "var(--black)" }}>
-            {run.brief.category} <span className="muted" style={{ fontWeight: 600 }}>·</span> {run.brief.style}
-          </div>
-          <div className="muted small">{run.brief.audience} · ${run.brief.budgetMin}–{run.brief.budgetMax}</div>
-        </div>
+      <div className="between" style={{ marginBottom: 24, gap: 12 }}>
+        <a href="/" className="link-quiet" style={{ fontSize: 13 }}>← New search</a>
         <span className={`modechip ${run.mode}`}>{run.mode === "live" ? "● LIVE" : "○ DEMO"}</span>
       </div>
 
@@ -107,12 +102,27 @@ export default function RunPage({ params }: { params: { id: string } }) {
       {/* Collection */}
       {run.collection && (
         <>
-          <div className="collection-head fade-up">
-            <div className="tagline" style={{ color: "var(--deep-purple)", marginBottom: 8 }}>Hand-picked for you</div>
-            <h2 className="gradient-text">{run.collection.title}</h2>
-            <p className="muted" style={{ maxWidth: 740, fontSize: 15, lineHeight: 1.6 }}>{run.collection.editorialAngle}</p>
-            <div className="small muted" style={{ marginTop: 6, fontWeight: 600 }}>{run.collection.diversityNotes}</div>
-          </div>
+          <header className="result-head fade-up">
+            <div className="result-overline">Hand-picked for you</div>
+            <h2 className="result-title">{cap(run.brief.category)}</h2>
+            <p className="result-sub">{run.collection.editorialAngle}</p>
+            <div className="result-facts">
+              <span className="result-stat">{run.collection.products.length} picks</span>
+              <span className="result-dot">·</span>
+              <span className="result-stat">${run.brief.budgetMin}–{run.brief.budgetMax}</span>
+              {run.collection.diversityNotes && (
+                <>
+                  <span className="result-dot">·</span>
+                  <span className="result-stat muted">{run.collection.diversityNotes}</span>
+                </>
+              )}
+            </div>
+            <div className="result-criteria">
+              {run.brief.style.split(/,\s*/).filter(Boolean).slice(0, 6).map((t) => (
+                <span className="criteria-tag" key={t}>{t}</span>
+              ))}
+            </div>
+          </header>
           <div className="cards">
             {run.collection.products.map((p, i) => (
               <ProductCard key={p.id} product={p} rank={i + 1} runId={run.id} brief={run.brief} />

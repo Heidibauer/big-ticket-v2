@@ -266,3 +266,26 @@ input:focus, textarea:focus {
 /* Tighter, calmer collection header */
 .collection-head h2 { font-size: 30px; letter-spacing: -0.03em; }
 .cards { gap: 22px; margin-top: 24px; }
+
+/* ---- Clean result header (Apple-style hierarchy) ---- */
+.result-head { margin: 8px 0 10px; }
+.result-overline {
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--deep-purple); margin-bottom: 10px;
+}
+.result-title {
+  font-size: 40px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.05;
+  color: #1d1d1f; margin: 0 0 12px;
+}
+.result-sub {
+  font-size: 17px; line-height: 1.5; color: #4a4a4f; max-width: 620px; margin: 0 0 16px; font-weight: 500;
+}
+.result-facts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.result-stat { font-size: 14px; font-weight: 700; color: #1d1d1f; }
+.result-stat.muted { font-weight: 500; color: #86868b; }
+.result-dot { color: #c7c7cc; }
+.result-criteria { display: flex; flex-wrap: wrap; gap: 7px; }
+.criteria-tag {
+  font-size: 12px; font-weight: 600; color: var(--deep-purple);
+  background: var(--light-purple); border-radius: 999px; padding: 5px 12px;
+}
